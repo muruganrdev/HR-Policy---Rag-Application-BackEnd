@@ -1,0 +1,67 @@
+# Python / FastAPI / VSCode / PyCharm / OS generated files
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+env/
+venv/
+ENV/
+
+# Distribution / packaging
+.Python
+*.egg
+*.egg-info/
+.dist/
+build/
+develop-eggs/
+.eggs/
+parts/
+sdist/
+var/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VS Code settings
+.vscode/
+
+# PyCharm / IntelliJ IDEA
+.idea/
+
+# Environment variable files
+.env
+.env.*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Data directories (local vector store, caches)
+chroma_db/
+
+# Logs (if any)
+logs/
