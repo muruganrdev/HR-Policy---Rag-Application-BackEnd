@@ -11,25 +11,33 @@ EVALUATION_DATASET = [
         "id": 1,
         "question": "How much annual leave do employees get?",
         "expected_source": "leave_policy.pdf",
-        "expected_keywords": ["annual leave", "20", "calendar year", "accrues"]
+        "expected_keywords": ["annual leave", "20", "calendar year", "accrues"],
+        "mode": "exact_fact",
+        "is_regression": True
     },
     {
         "id": 2,
         "question": "How many days off can I take for vacation?",
         "expected_source": "leave_policy.pdf",
-        "expected_keywords": ["annual leave", "20", "vacation"]
+        "expected_keywords": ["annual leave", "20", "vacation"],
+        "mode": "exact_fact",
+        "is_regression": True
     },
     {
         "id": 3,
         "question": "How many days of unused annual leave can be carried over or encashed?",
         "expected_source": "leave_policy.pdf",
-        "expected_keywords": ["carried over", "10 days", "encash", "5 days"]
+        "expected_keywords": ["carried over", "10 days", "encash", "5 days"],
+        "mode": "exact_fact",
+        "is_regression": False
     },
     {
         "id": 4,
         "question": "What is the paid maternity and paternity leave duration?",
         "expected_source": "leave_policy.pdf",
-        "expected_keywords": ["maternity", "26 weeks", "paternity", "5 working days"]
+        "expected_keywords": ["maternity", "26 weeks", "paternity", "5 working days"],
+        "mode": "exact_fact",
+        "is_regression": False
     },
 
     # --- Attendance Policy (attendance_policy.pdf) ---
@@ -37,19 +45,25 @@ EVALUATION_DATASET = [
         "id": 5,
         "question": "What is the grace period for arriving at work in the morning?",
         "expected_source": "attendance_policy.pdf",
-        "expected_keywords": ["grace period", "10 minutes", "9:00 AM", "punctuality"]
+        "expected_keywords": ["grace period", "10 minutes", "9:00 AM", "punctuality"],
+        "mode": "exact_fact",
+        "is_regression": False
     },
     {
         "id": 6,
         "question": "What happens if I am late to the office?",
         "expected_source": "attendance_policy.pdf",
-        "expected_keywords": ["late arrival", "9:11 AM", "half-day absence", "LWP"]
+        "expected_keywords": ["late arrival", "9:11 AM", "half-day absence", "LWP"],
+        "mode": "multi_tier_penalties",
+        "is_regression": True
     },
     {
         "id": 7,
         "question": "How is habitual absenteeism handled by HR?",
         "expected_source": "attendance_policy.pdf",
-        "expected_keywords": ["habitual absent", "6 days", "verbal counselling", "written warning"]
+        "expected_keywords": ["habitual absent", "6 days", "verbal counselling", "written warning"],
+        "mode": "multi_tier_penalties",
+        "is_regression": False
     },
 
     # --- Work From Home Policy (work_from_home_policy.pdf) ---
@@ -57,19 +71,25 @@ EVALUATION_DATASET = [
         "id": 8,
         "question": "Can I work from home and what is the weekly limit?",
         "expected_source": "work_from_home_policy.pdf",
-        "expected_keywords": ["work from home", "2 days", "week", "Wednesday", "Friday"]
+        "expected_keywords": ["work from home", "2 days", "week", "Wednesday", "Friday"],
+        "mode": "exact_fact",
+        "is_regression": False
     },
     {
         "id": 9,
         "question": "What are the eligibility requirements for remote work?",
         "expected_source": "work_from_home_policy.pdf",
-        "expected_keywords": ["6 months", "continuous employment", "10 Mbps", "eligibility"]
+        "expected_keywords": ["6 months", "continuous employment", "10 Mbps", "eligibility"],
+        "mode": "eligibility_conditions",
+        "is_regression": False
     },
     {
         "id": 10,
         "question": "How much advance notice is required to request a work from home day?",
         "expected_source": "work_from_home_policy.pdf",
-        "expected_keywords": ["24 hours", "advance", "HR portal", "manager"]
+        "expected_keywords": ["24 hours", "advance", "HR portal", "manager"],
+        "mode": "procedure_application",
+        "is_regression": False
     },
 
     # --- Working Hours Policy (working_hours_policy.pdf) ---
@@ -77,19 +97,25 @@ EVALUATION_DATASET = [
         "id": 11,
         "question": "What are the core working hours and break timings?",
         "expected_source": "working_hours_policy.pdf",
-        "expected_keywords": ["40 paid hours", "9:00 AM", "6:00 PM", "lunch break"]
+        "expected_keywords": ["40 paid hours", "9:00 AM", "6:00 PM", "lunch break"],
+        "mode": "exact_fact",
+        "is_regression": False
     },
     {
         "id": 12,
         "question": "What is the shift allowance for employees working the night shift?",
         "expected_source": "working_hours_policy.pdf",
-        "expected_keywords": ["night shift", "20%", "shift allowance", "10:00 PM"]
+        "expected_keywords": ["night shift", "20%", "shift allowance", "10:00 PM"],
+        "mode": "exact_fact",
+        "is_regression": False
     },
     {
         "id": 13,
         "question": "How is overtime work compensated for non-exempt employees?",
         "expected_source": "working_hours_policy.pdf",
-        "expected_keywords": ["overtime", "1.5x", "2.0x", "non-exempt"]
+        "expected_keywords": ["overtime", "1.5x", "2.0x", "non-exempt"],
+        "mode": "calculation_rule",
+        "is_regression": False
     },
 
     # --- Employee Conduct Policy (employee_conduct_policy.pdf) ---
@@ -97,19 +123,25 @@ EVALUATION_DATASET = [
         "id": 14,
         "question": "How and within how many days should workplace harassment be reported?",
         "expected_source": "employee_conduct_policy.pdf",
-        "expected_keywords": ["harassment", "Internal Complaints Committee", "ICC", "30 days"]
+        "expected_keywords": ["harassment", "Internal Complaints Committee", "ICC", "30 days"],
+        "mode": "procedure_application",
+        "is_regression": False
     },
     {
         "id": 15,
         "question": "What is the threshold value for disclosing gifts received from clients or vendors?",
         "expected_source": "employee_conduct_policy.pdf",
-        "expected_keywords": ["gifts", "INR 1,000", "conflict of interest", "HR"]
+        "expected_keywords": ["gifts", "INR 1,000", "conflict of interest", "HR"],
+        "mode": "exact_fact",
+        "is_regression": True
     },
     {
         "id": 16,
         "question": "What are the progressive steps in the company disciplinary process?",
         "expected_source": "employee_conduct_policy.pdf",
-        "expected_keywords": ["Verbal Warning", "Written Warning", "PIP", "Termination"]
+        "expected_keywords": ["Verbal Warning", "Written Warning", "PIP", "Termination"],
+        "mode": "multi_tier_penalties",
+        "is_regression": False
     },
 
     # --- Notice Period Policy (notice_period_policy.pdf) ---
@@ -117,19 +149,25 @@ EVALUATION_DATASET = [
         "id": 17,
         "question": "What is the notice period for employee resignation across different grades?",
         "expected_source": "notice_period_policy.pdf",
-        "expected_keywords": ["Grade 1-3", "30 days", "Grade 4-6", "60 days", "Grade 7-9", "90 days"]
+        "expected_keywords": ["Grade 1-3", "30 days", "Grade 4-6", "60 days", "Grade 7-9", "90 days"],
+        "mode": "multi_condition_matrix",
+        "is_regression": False
     },
     {
         "id": 18,
         "question": "How is the notice period buyout amount calculated for early exit?",
         "expected_source": "notice_period_policy.pdf",
-        "expected_keywords": ["buyout", "Basic Salary", "30", "days not served"]
+        "expected_keywords": ["buyout", "Basic Salary", "30", "days not served"],
+        "mode": "calculation_rule",
+        "is_regression": False
     },
     {
         "id": 19,
         "question": "What is the timeline for processing the Full and Final settlement after leaving?",
         "expected_source": "notice_period_policy.pdf",
-        "expected_keywords": ["Full and Final", "F&F", "45 working days", "settlement"]
+        "expected_keywords": ["Full and Final", "F&F", "45 working days", "settlement"],
+        "mode": "procedure_application",
+        "is_regression": False
     },
 
     # --- Leave Policy (leave_policy.pdf) — Sick Leave ---
@@ -137,9 +175,75 @@ EVALUATION_DATASET = [
         "id": 20,
         "question": "How many paid sick leave days are employees entitled to per year and can unused sick leave be carried over?",
         "expected_source": "leave_policy.pdf",
-        "expected_keywords": ["12 days", "sick leave", "carried over", "medical certificate"]
+        "expected_keywords": ["12 days", "sick leave", "carried over", "medical certificate"],
+        "mode": "eligibility_conditions",
+        "is_regression": False
+    },
+
+    # --- Week 6 validated additions ---
+    {
+        "id": 21,
+        "question": "What is the minimum internet speed requirement for eligible employees to work from home?",
+        "expected_source": "work_from_home_policy.pdf",
+        "expected_keywords": ["10 Mbps", "reliable internet", "home workspace", "eligibility"],
+        "mode": "eligibility_conditions",
+        "is_regression": False
+    },
+    {
+        "id": 22,
+        "question": "Can a manager revoke an approved work from home day in an operational emergency, and what notice is required?",
+        "expected_source": "work_from_home_policy.pdf",
+        "expected_keywords": ["revoke", "4 hours", "manager", "operational urgency"],
+        "mode": "procedure_application",
+        "is_regression": False
+    },
+    {
+        "id": 23,
+        "question": "How long does the NDA obligation continue after employment ends?",
+        "expected_source": "employee_conduct_policy.pdf",
+        "expected_keywords": ["NDA", "2 years", "post-employment", "confidentiality"],
+        "mode": "exact_fact",
+        "is_regression": False
+    },
+    {
+        "id": 24,
+        "question": "Within how many working days must a potential conflict of interest be disclosed to HR?",
+        "expected_source": "employee_conduct_policy.pdf",
+        "expected_keywords": ["conflict of interest", "5 working days", "HR", "disclose"],
+        "mode": "procedure_application",
+        "is_regression": False
+    },
+    {
+        "id": 25,
+        "question": "What is the overtime rate for non-exempt employees working on weekends or public holidays?",
+        "expected_source": "working_hours_policy.pdf",
+        "expected_keywords": ["overtime", "2.0x", "weekend", "public holiday", "non-exempt"],
+        "mode": "calculation_rule",
+        "is_regression": False
+    },
+    {
+        "id": 27,
+        "question": "What happens if an employee fails to complete adequate knowledge transfer during the notice period?",
+        "expected_source": "notice_period_policy.pdf",
+        "expected_keywords": ["knowledge transfer", "notice period", "Full and Final", "impact"],
+        "mode": "multi_tier_penalties",
+        "is_regression": False
+    },
+    {
+        "id": 28,
+        "question": "Does the company provide pet leave or pawternity leave?",
+        "expected_source": None,
+        "expected_keywords": [],
+        "mode": "unanswerable_fallback",
+        "is_regression": False
     }
 ]
+
+
+if __name__ == "__main__":
+    print(f"Total evaluation test questions: {len(EVALUATION_DATASET)}")
+    for item in EVALUATION_DATASET:
+        print(f"[{item['id']:02d}] {item['expected_source']:<28} -> {item['question']}")
 
 
 if __name__ == "__main__":
