@@ -130,6 +130,14 @@ EVALUATION_DATASET = [
         "question": "What is the timeline for processing the Full and Final settlement after leaving?",
         "expected_source": "notice_period_policy.pdf",
         "expected_keywords": ["Full and Final", "F&F", "45 working days", "settlement"]
+    },
+
+    # --- Leave Policy (leave_policy.pdf) — Sick Leave ---
+    {
+        "id": 20,
+        "question": "How many paid sick leave days are employees entitled to per year and can unused sick leave be carried over?",
+        "expected_source": "leave_policy.pdf",
+        "expected_keywords": ["12 days", "sick leave", "carried over", "medical certificate"]
     }
 ]
 

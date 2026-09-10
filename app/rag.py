@@ -1,11 +1,14 @@
 import re
 import os
+import time
 import chromadb
 import ollama
 from sentence_transformers import SentenceTransformer
 from app.reranker import rerank_documents
 from app.preprocess import preprocess_question
 from app.rewrite import rewrite_question
+from app.query_expansion import expand_query
+from app.observability import observe
 
 
 
@@ -95,9 +98,93 @@ collection = client.get_collection(
 
 
 # --------------------------------
-# 4. RAG Function
+# 4. Observability helpers (no-op safe)
 # --------------------------------
 
+import contextlib
+import logging
+
+_obs_logger = logging.getLogger(__name__)
+
+@contextlib.contextmanager
+def _observe_span(name: str, input=None):
+    """
+    Context manager that wraps a pipeline stage in a Langfuse span.
+    Silently no-ops if Langfuse is disabled or throws any error.
+    The wrapped code always runs regardless of Langfuse availability.
+    """
+    from app.observability import is_enabled
+    if is_enabled():
+        try:
+            from langfuse import Langfuse
+            _client = Langfuse()
+            span = _client.start_observation(name=name, type="span", input=input)
+            try:
+                yield
+            except Exception:
+                raise
+            finally:
+                try:
+                    _client.update_current_span(end=True)
+                except Exception:
+                    pass
+        except Exception as _e:
+            _obs_logger.debug("Langfuse span '%s' failed (non-fatal): %s", name, _e)
+            yield
+    else:
+        yield
+
+
+def _observe_retrieval_event(*, query, n_results, candidates, distance_threshold, latency_ms):
+    """Logs a structured retrieval metadata event to Langfuse (non-fatal)."""
+    from app.observability import is_enabled
+    if not is_enabled():
+        return
+    try:
+        from langfuse import Langfuse
+        _client = Langfuse()
+        _client.create_event(
+            name="vector_retrieval",
+            input={"query": query, "n_results": n_results,
+                   "distance_threshold": distance_threshold},
+            output={
+                "candidates": candidates,
+                "n_candidates_retrieved": len(candidates),
+                "latency_ms": latency_ms,
+            },
+        )
+    except Exception as _e:
+        _obs_logger.debug("Langfuse retrieval event failed (non-fatal): %s", _e)
+
+
+def _observe_filtering_event(*, distance_threshold, candidates_before, passed, filtered_out):
+    """Logs a structured distance-filtering event to Langfuse (non-fatal)."""
+    from app.observability import is_enabled
+    if not is_enabled():
+        return
+    try:
+        from langfuse import Langfuse
+        _client = Langfuse()
+        _client.create_event(
+            name="distance_filtering",
+            input={"distance_threshold": distance_threshold,
+                   "candidates_before": candidates_before},
+            output={
+                "passed": passed,
+                "filtered_out": filtered_out,
+                "chunks_passed": len(passed),
+                "chunks_filtered_out": len(filtered_out),
+            },
+        )
+    except Exception as _e:
+        _obs_logger.debug("Langfuse filtering event failed (non-fatal): %s", _e)
+
+
+# --------------------------------
+# 5. RAG Function
+# --------------------------------
+
+@observe(name="hr_rag_pipeline")
 def ask_question(question: str):
     """
     Full HR Policy RAG pipeline:
@@ -132,17 +219,35 @@ def ask_question(question: str):
     # Convert question into embedding vector
     # --------------------------------
 
-    processed_question = preprocess_question(question)
-    rewritten_question = rewrite_question(processed_question)
-    query_embedding = embedding_model.encode(
-        rewritten_question
-    ).tolist()
+    # ── Preprocessing ────────────────────────────────────────────────────────
+    with _observe_span("preprocessing", input={"raw_question": question}):
+        processed_question = preprocess_question(question)
+
+    # ── Query rewrite ────────────────────────────────────────────────────────
+    with _observe_span("query_rewrite", input={"preprocessed": processed_question}):
+        rewritten_question = rewrite_question(processed_question)
+
+    # ── Query expansion ──────────────────────────────────────────────────────
+    with _observe_span("query_expansion", input={"rewritten": rewritten_question}):
+        expanded_query = expand_query(rewritten_question)
+
+    print(f"Original question: {question}")
+    print(f"Preprocessed question: {processed_question}")
+    print(f"Rewritten question: {rewritten_question}")
+    print(f"Expanded query: {expanded_query}")
+
+    # ── Embedding ────────────────────────────────────────────────────────────
+    with _observe_span("embedding", input={"query": expanded_query,
+                                           "model": "all-MiniLM-L6-v2"}):
+        query_embedding = embedding_model.encode(expanded_query).tolist()
 
 
     # --------------------------------
     # Retrieve top-N candidate chunks
     # --------------------------------
 
+    # ── Vector retrieval ─────────────────────────────────────────────────────
+    _t_retr = time.time()
     results = collection.query(
         query_embeddings=[query_embedding],
         n_results=N_RESULTS,
@@ -152,14 +257,35 @@ def ask_question(question: str):
             "distances"
         ]
     )
+    _retr_latency = round((time.time() - _t_retr) * 1000, 2)
 
     documents = results["documents"][0]
     metadatas = results["metadatas"][0]
     distances = results["distances"][0]
-    # Rerank retrieved documents using CrossEncoder
-    documents, metadatas, distances = rerank_documents(
-        rewritten_question, documents, metadatas, distances
+
+    _candidates = [
+        {
+            "rank": i + 1,
+            "source": m.get("source"),
+            "chunk_index": m.get("chunk_index"),
+            "distance": round(d, 4),
+        }
+        for i, (m, d) in enumerate(zip(metadatas, distances))
+    ]
+    _observe_retrieval_event(
+        query=expanded_query,
+        n_results=N_RESULTS,
+        candidates=_candidates,
+        distance_threshold=DISTANCE_THRESHOLD,
+        latency_ms=_retr_latency,
     )
+
+    # ── Reranking ────────────────────────────────────────────────────────────
+    with _observe_span("reranking", input={"n_candidates": len(documents)}):
+        # Rerank retrieved documents using CrossEncoder
+        documents, metadatas, distances = rerank_documents(
+            expanded_query, documents, metadatas, distances
+        )
 
 
     # --------------------------------
@@ -168,17 +294,26 @@ def ask_question(question: str):
 
     context_parts = []
     relevant_sources = []
+    _filtered_in = []
+    _filtered_out = []
 
-    for document, metadata, distance in zip(
-        documents, metadatas, distances
+    for _rank, (document, metadata, distance) in enumerate(
+        zip(documents, metadatas, distances), start=1
     ):
+        _src = metadata["source"]
+        _chk = metadata["chunk_index"]
 
         # Discard irrelevant chunks beyond threshold
         if distance > DISTANCE_THRESHOLD:
+            _filtered_out.append({"rank": _rank, "source": _src,
+                                   "chunk_index": _chk, "distance": round(distance, 4)})
             continue
 
-        source = metadata["source"]
-        chunk_index = metadata["chunk_index"]
+        _filtered_in.append({"rank": _rank, "source": _src,
+                              "chunk_index": _chk, "distance": round(distance, 4)})
+
+        source = _src
+        chunk_index = _chk
 
         # Build context block with citation
         context_parts.append(
@@ -196,6 +331,14 @@ Content:
             "source": source,
             "chunk": chunk_index
         })
+
+    # ── Distance filtering observation event ─────────────────────────────────
+    _observe_filtering_event(
+        distance_threshold=DISTANCE_THRESHOLD,
+        candidates_before=len(documents),
+        passed=_filtered_in,
+        filtered_out=_filtered_out,
+    )
 
 
     # --------------------------------
@@ -249,15 +392,23 @@ Answer:
     # Send grounded prompt to Llama 3
     # --------------------------------
 
-    response = ollama.chat(
-        model=OLLAMA_MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
+    # ── LLM generation ──────────────────────────────────────────────────────
+    _t_llm = time.time()
+    with _observe_span("llm_generation", input={
+        "model": OLLAMA_MODEL,
+        "n_context_chunks": len(context_parts),
+        "question": question,
+    }):
+        response = ollama.chat(
+            model=OLLAMA_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+    _llm_latency = round((time.time() - _t_llm) * 1000, 2)
 
 
     # --------------------------------
