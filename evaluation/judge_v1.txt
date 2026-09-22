@@ -1,0 +1,28 @@
+Evaluate the answer using the supplied question and policy context only.
+
+Goal: determine whether the answer correctly answers the user's question using the provided policy context without introducing unsupported claims.
+
+Rules:
+- Evaluate semantic correctness only.
+- Use only the supplied question, answer, and context.
+- Do not use outside knowledge.
+- Do not reward answers that sound plausible but are unsupported.
+- Do not evaluate deterministic assertion criteria such as section references, handbook versions, numeric presence, or refusal wording.
+- Compare the user's question, the retrieved policy context, and the generated answer.
+- If the answer addresses the user question and is supported by the context, return PASS.
+- Otherwise return FAIL.
+
+Return ONLY a JSON object in this exact shape:
+{{
+  "verdict": "PASS",
+  "reason": "<brief reason>"
+}}
+
+User Question:
+{question}
+
+Retrieved Policy Context:
+{context}
+
+Generated Answer:
+{answer}

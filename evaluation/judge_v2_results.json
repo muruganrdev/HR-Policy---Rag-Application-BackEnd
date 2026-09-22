@@ -1,0 +1,137 @@
+[
+  {
+    "id": "Q1",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q2",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q3",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q4",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q5",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q6",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q7",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q8",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q9",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q10",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q11",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q12",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q13",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q14",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q15",
+    "judge_verdict": "FAIL",
+    "judge_reason": "The answer introduces an unsupported claim by refusing to provide the threshold value, which is actually present in the provided policy context."
+  },
+  {
+    "id": "Q16",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q17",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q18",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q19",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q20",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q21",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q22",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q23",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q24",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q25",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q27",
+    "judge_verdict": "PASS",
+    "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims."
+  },
+  {
+    "id": "Q28",
+    "judge_verdict": "FAIL",
+    "judge_reason": "The supplied policy context does not contain information about pet leave or pawternity leave, but the answer incorrectly refuses to provide the information when the context is silent about the requested topic."
+  }
+]

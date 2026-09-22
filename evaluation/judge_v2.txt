@@ -1,0 +1,116 @@
+Evaluate the answer using the supplied question and policy context only.
+
+Goal: determine whether the answer correctly answers the user's question using the provided policy context without introducing unsupported claims.
+
+Criterion:
+Does the answer correctly answer the user's question using the provided policy context without introducing unsupported claims?
+
+Rules:
+- Evaluate semantic correctness only.
+- Use only the supplied question, answer, and context.
+- Do not use outside knowledge.
+- Do not use the human reference labels or any hidden answer key.
+- Do not reward answers that sound plausible but are unsupported.
+- Do not evaluate deterministic assertion criteria such as section references, handbook versions, numeric presence, or refusal wording.
+- Compare the user's question, the retrieved policy context, and the generated answer.
+- Judge the answer content itself. Ignore irrelevant citation, provenance, source-file names, chunk labels, or document-name wording unless that wording changes the substantive answer.
+- Determine correctness from the question, supplied policy context, and RAG answer only. Do not add facts absent from the policy context.
+- Evaluate the full answer, including any end summary or conclusion. A final conclusion that materially contradicts the policy context makes the answer incorrect even if earlier lines are correct.
+- If the answer contains a contradiction with the policy context, return FAIL.
+- If the answer is materially incomplete, return FAIL when the question asks for multiple material requirements, conditions, steps, consequences, or components and the answer omits a material part needed to answer the question correctly. Do not fail an answer merely because it omits extra policy details that are not necessary to answer the user’s specific question.
+- If the answer is otherwise correct but carries citation/provenance noise, return PASS if the substantive answer is supported by the policy context.
+
+Unsupported / unanswerable policy questions:
+First classify whether the supplied policy context contains enough information to answer the user's question.
+
+A. SUPPORTED QUESTION
+If the supplied policy context contains the information needed to answer the question:
+- The answer must provide the requested information correctly.
+- If the answer says "I don't know", "not available", "not covered", or otherwise refuses to answer, return FAIL.
+- If the answer gives unsupported or incorrect information, return FAIL.
+- If the answer correctly answers the question using the context, return PASS.
+
+B. UNSUPPORTED / UNANSWERABLE QUESTION
+If the supplied policy context does NOT contain the information needed to answer the question:
+- The answer must NOT invent, guess, infer, or fabricate a policy.
+- If the answer explicitly says that the requested information is unavailable, cannot be determined, or is not covered by the provided policy documents, return PASS.
+- This is a correct grounded response because the system cannot answer something that is absent from the supplied policy context.
+- If the answer invents or guesses an answer, return FAIL.
+
+IMPORTANT:
+For an unsupported question, an appropriate refusal is PASS, NOT FAIL.
+
+Use this exact decision table:
+| Context contains requested information | Answer behavior | Verdict |
+|---|---|---|
+| YES | Correctly answers from context | PASS |
+| YES | Refuses / says information unavailable | FAIL |
+| YES | Gives unsupported or incorrect answer | FAIL |
+| NO | Correctly states information is unavailable | PASS |
+| NO | Invents / guesses / fabricates an answer | FAIL |
+
+Q28-type example:
+Question: Does the company provide pet leave?
+Policy context: The supplied policy context contains no information about pet leave.
+Answer: I don't know based on the provided HR policy documents.
+Verdict: PASS
+Reason: The supplied policy context does not contain information about pet leave, and the answer correctly states that the information is unavailable without inventing a policy.
+
+MANDATORY CONSISTENCY CHECK:
+Before returning the final JSON:
+1. Determine whether the context contains the requested information.
+2. Determine whether the answer provides information or appropriately refuses.
+3. Apply the decision table above.
+4. Verify that the verdict matches the reason.
+5. If your reason says the context does not contain the requested information AND the answer correctly states that it is unavailable, the verdict MUST be PASS.
+
+- If the answer is a correct semantic paraphrase or a faithful restatement using different wording, it may PASS when supported by the context.
+- If the answer addresses the user question and is supported by the context, return PASS. Otherwise return FAIL.
+
+Decision procedure:
+Before deciding PASS or FAIL, evaluate in this order:
+1. Identify exactly what the user is asking.
+2. Identify what information is required to answer it.
+3. Check whether that information exists in the supplied policy context.
+4. If the context contains the answer:
+   - evaluate whether the RAG answer correctly provides it.
+   - an unjustified refusal is FAIL.
+5. If the context does not contain the answer:
+   - determine whether the RAG answer appropriately acknowledges that limitation.
+   - an appropriate non-hallucinatory refusal/unavailability statement is PASS.
+   - a fabricated or unsupported answer is FAIL.
+6. Check the entire answer for contradictions.
+7. Check for unsupported claims.
+8. Check material omissions only when they are necessary to answer the actual question.
+9. Ensure the final verdict is logically consistent with the reason.
+
+Few-shot examples:
+
+Example 1 - Explicit contradiction
+Question: How many days of unused annual leave can be carried over or encashed?
+Policy context: Up to 10 days may be carried over. A maximum of 5 days may be encashed per calendar year.
+Answer: Up to 10 days may be carried over and up to 5 days may be encashed. Therefore, up to 10 days can be carried over or encashed.
+Expected verdict: FAIL
+Reason: The final conclusion incorrectly applies the 10-day carry-over limit to encashment and therefore contradicts the supplied policy context.
+
+Example 2 - Supported answer with irrelevant provenance/citation wording
+Question: Within how many working days must a potential conflict of interest be disclosed to HR?
+Policy context: Potential conflicts must be disclosed to HR in writing within 5 working days.
+Answer: A potential conflict must be disclosed to HR in writing within 5 working days. Source: employee_conduct_policy.pdf, Chunk 4.
+Expected verdict: PASS
+Reason: The substantive answer is supported by the policy context. The citation/provenance wording does not change the answer.
+
+Return ONLY a JSON object in this exact shape:
+{{
+  "verdict": "PASS",
+  "reason": "<brief reason>"
+}}
+
+User Question:
+{question}
+
+Retrieved Policy Context:
+{context}
+
+Generated Answer:
+{answer}

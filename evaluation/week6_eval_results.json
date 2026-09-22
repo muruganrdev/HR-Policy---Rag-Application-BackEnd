@@ -1,0 +1,1336 @@
+{
+  "total_cases": 27,
+  "mode_counts": {
+    "exact_fact": 10,
+    "multi_tier_penalties": 4,
+    "eligibility_conditions": 3,
+    "procedure_application": 5,
+    "calculation_rule": 3,
+    "multi_condition_matrix": 1,
+    "unanswerable_fallback": 1
+  },
+  "mode_judge_pass": {
+    "exact_fact": 10,
+    "multi_tier_penalties": 4,
+    "eligibility_conditions": 3,
+    "procedure_application": 5,
+    "calculation_rule": 3,
+    "multi_condition_matrix": 1,
+    "unanswerable_fallback": 1
+  },
+  "mode_judge_fail": {},
+  "agreement": {
+    "agreements": 22,
+    "disagreements": 5,
+    "agreement_percentage": 81.48,
+    "disagreement_ids": [
+      "Q1",
+      "Q2",
+      "Q3",
+      "Q6",
+      "Q15"
+    ]
+  },
+  "cases": [
+    {
+      "id": "Q1",
+      "taxonomy_mode": "exact_fact",
+      "question": "How much annual leave do employees get?",
+      "answer": "According to the context, all full-time employees are entitled to 20 working days of annual leave per calendar year. Part-time employees receive annual leave on a pro-rata basis calculated against a 40-hour full-time week.",
+      "sources": [
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 0
+        }
+      ],
+      "retrieved_context": "Source: leave_policy.pdf\nChunk: 2\n\nContent:\n2. Annual Leave (Vacation Leave)\nAll full-time employees are entitled to 20 working days of annual leave per calendar year. Part-time\nemployees receive annual leave on a pro-rata basis calculated against a 40-hour full-time week.\nNew employees are eligible for annual leave after completing 3 months of continuous\nemployment.\nAnnual leave accrues at a rate of 1.67 days per month of service.\nUnused annual leave of up to 10 days may be carried over to the next calendar year. Any\nbalance exceeding 10 days will lapse on December 31st.\nEmployees wishing to encash unused leave must submit a request to HR by November 30th. A\nmaximum of 5 days may be encashed per calendar year.\nAnnual leave must be applied at least 5 working days in advance through the HR portal.\nThe direct manager must approve leav\n\n\n\nSource: leave_policy.pdf\nChunk: 4\n\nContent:\n3. Sick Leave\nFull-time employees are entitled to 12 days of paid sick leave per calendar year. Sick leave does not\naccrue and unused sick leave cannot be carried over or encashed.\nFor absences of 1-2 days, employees must notify their manager by 9:00 AM on the first day of\nabsence.\nFor absences exceeding 2 consecutive days, a medical certificate from a registered medical\npractitioner must be submitted.\nEmployees who exhaust their sick leave entitlement may apply for unpaid leave with managerial\napproval.\nRepeated or patterned sick leave usage may be subject to a formal attendance review.\n\n\n\nSource: leave_policy.pdf\nChunk: 8\n\nContent:\n7. Leave Without Pay (LWP)\nEmployees who have exhausted their entitled leave and require additional time off may apply for\nLWP. LWP is granted at the discretion of the department head and HR and will result in a salary\ndeduction for the period of absence.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 2\n\nContent:\n2. Employee Notice Period (Resignation)\nWhen an employee wishes to resign, the following notice periods apply based on the employee\ngrade:\nGrade 1-3 (Junior / Associate): 30 days (1 month)\nGrade 4-6 (Senior / Lead): 60 days (2 months)\nGrade 7-9 (Manager / Senior Manager): 90 days (3 months)\nGrade 10 and above (Director / VP / C-Suite): 90 days minimum, or as specified in the\nemployment contract.\nNotice periods begin on the date the written resignation is submitted and accepted by HR.\n\n\n\nSource: leave_policy.pdf\nChunk: 0\n\nContent:\nACME Corporation\n Leave Policy\n Effective Date: January 1, 2024 | Version: 1.0 | HR Department\n DISCLAIMER: This is a sample/demo HR policy document for testing purposes only. Not a real company policy.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context contains the requested information, and the answer correctly provides it.",
+      "human_label": "FAIL",
+      "agreement": false,
+      "error": null
+    },
+    {
+      "id": "Q2",
+      "taxonomy_mode": "exact_fact",
+      "question": "How many days off can I take for vacation?",
+      "answer": "According to the context in the leave_policy.pdf, all full-time employees are entitled to 20 working days of annual leave per calendar year.",
+      "sources": [
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 4
+        }
+      ],
+      "retrieved_context": "Source: leave_policy.pdf\nChunk: 2\n\nContent:\n2. Annual Leave (Vacation Leave)\nAll full-time employees are entitled to 20 working days of annual leave per calendar year. Part-time\nemployees receive annual leave on a pro-rata basis calculated against a 40-hour full-time week.\nNew employees are eligible for annual leave after completing 3 months of continuous\nemployment.\nAnnual leave accrues at a rate of 1.67 days per month of service.\nUnused annual leave of up to 10 days may be carried over to the next calendar year. Any\nbalance exceeding 10 days will lapse on December 31st.\nEmployees wishing to encash unused leave must submit a request to HR by November 30th. A\nmaximum of 5 days may be encashed per calendar year.\nAnnual leave must be applied at least 5 working days in advance through the HR portal.\nThe direct manager must approve leav\n\n\n\nSource: working_hours_policy.pdf\nChunk: 6\n\nContent:\n6. Maximum Working Hours\nNo employee shall work more than 48 hours in any single week without explicit written approval\nfrom HR and the department VP.\nEmployees are entitled to a mandatory rest period of at least 12 hours between shifts.\nConsecutive working days without a day off shall not exceed 6 days.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 3\n\nContent:\n3. WFH Entitlement\nEligible employees may work from home for a maximum of 2 days per week. The default WFH days\nare Wednesday and Friday, unless otherwise approved by the department head.\nEmployees may not carry forward unused WFH days to the following week.\nWFH days during public holidays or annual leave periods are not replaced.\nDuring probationary periods (first 6 months), employees are not eligible for WFH arrangements.\n\n\n\nSource: leave_policy.pdf\nChunk: 4\n\nContent:\n3. Sick Leave\nFull-time employees are entitled to 12 days of paid sick leave per calendar year. Sick leave does not\naccrue and unused sick leave cannot be carried over or encashed.\nFor absences of 1-2 days, employees must notify their manager by 9:00 AM on the first day of\nabsence.\nFor absences exceeding 2 consecutive days, a medical certificate from a registered medical\npractitioner must be submitted.\nEmployees who exhaust their sick leave entitlement may apply for unpaid leave with managerial\napproval.\nRepeated or patterned sick leave usage may be subject to a formal attendance review.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "FAIL",
+      "agreement": false,
+      "error": null
+    },
+    {
+      "id": "Q3",
+      "taxonomy_mode": "exact_fact",
+      "question": "How many days of unused annual leave can be carried over or encashed?",
+      "answer": "According to the provided HR policy documents, unused annual leave of up to **10 days** may be carried over to the next calendar year. Additionally, a maximum of **5 days** may be encashed per calendar year.",
+      "sources": [
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 8
+        }
+      ],
+      "retrieved_context": "Source: leave_policy.pdf\nChunk: 2\n\nContent:\n2. Annual Leave (Vacation Leave)\nAll full-time employees are entitled to 20 working days of annual leave per calendar year. Part-time\nemployees receive annual leave on a pro-rata basis calculated against a 40-hour full-time week.\nNew employees are eligible for annual leave after completing 3 months of continuous\nemployment.\nAnnual leave accrues at a rate of 1.67 days per month of service.\nUnused annual leave of up to 10 days may be carried over to the next calendar year. Any\nbalance exceeding 10 days will lapse on December 31st.\nEmployees wishing to encash unused leave must submit a request to HR by November 30th. A\nmaximum of 5 days may be encashed per calendar year.\nAnnual leave must be applied at least 5 working days in advance through the HR portal.\nThe direct manager must approve leav\n\n\n\nSource: leave_policy.pdf\nChunk: 4\n\nContent:\n3. Sick Leave\nFull-time employees are entitled to 12 days of paid sick leave per calendar year. Sick leave does not\naccrue and unused sick leave cannot be carried over or encashed.\nFor absences of 1-2 days, employees must notify their manager by 9:00 AM on the first day of\nabsence.\nFor absences exceeding 2 consecutive days, a medical certificate from a registered medical\npractitioner must be submitted.\nEmployees who exhaust their sick leave entitlement may apply for unpaid leave with managerial\napproval.\nRepeated or patterned sick leave usage may be subject to a formal attendance review.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 3\n\nContent:\n3. WFH Entitlement\nEligible employees may work from home for a maximum of 2 days per week. The default WFH days\nare Wednesday and Friday, unless otherwise approved by the department head.\nEmployees may not carry forward unused WFH days to the following week.\nWFH days during public holidays or annual leave periods are not replaced.\nDuring probationary periods (first 6 months), employees are not eligible for WFH arrangements.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 8\n\nContent:\n8. Review and Withdrawal\nWFH eligibility may be withdrawn if an employee's performance declines, attendance requirements\nare not met, or if business needs require full-time on-site presence. A minimum of 5 working days\nnotice will be provided before withdrawal.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT\n\n\n\nSource: leave_policy.pdf\nChunk: 8\n\nContent:\n7. Leave Without Pay (LWP)\nEmployees who have exhausted their entitled leave and require additional time off may apply for\nLWP. LWP is granted at the discretion of the department head and HR and will result in a salary\ndeduction for the period of absence.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context does not contain the requested information, and the answer correctly states that the information is unavailable without inventing a policy.",
+      "human_label": "FAIL",
+      "agreement": false,
+      "error": null
+    },
+    {
+      "id": "Q4",
+      "taxonomy_mode": "exact_fact",
+      "question": "What is the paid maternity and paternity leave duration?",
+      "answer": "According to the context, the paid maternity leave duration is 26 weeks for the first two live births, and the paid paternity leave duration is 5 working days within 30 days of the birth of a child.",
+      "sources": [
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 5
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 1
+        }
+      ],
+      "retrieved_context": "Source: leave_policy.pdf\nChunk: 5\n\nContent:\n4. Maternity and Paternity Leave\n\nEligible female employees are entitled to 26 weeks of paid maternity leave for the first two live\nbirths. The leave may commence 8 weeks before the expected date of delivery.\nMale employees are entitled to 5 working days of paid paternity leave within 30 days of the birth of a\nchild.\nEmployees must notify HR at least 12 weeks before the expected start of maternity leave.\nSupporting documentation (expected delivery date from a registered doctor) must be submitted\nto HR.\n\n\n\nSource: leave_policy.pdf\nChunk: 6\n\nContent:\n5. Compassionate Leave\nEmployees are entitled to 3 days of paid compassionate leave in the event of the death of an\nimmediate family member (spouse, parent, child, or sibling).\nProof of relationship and death certificate may be requested by HR.\nAdditional unpaid leave may be granted at managerial discretion.\n\n\n\nSource: leave_policy.pdf\nChunk: 2\n\nContent:\n2. Annual Leave (Vacation Leave)\nAll full-time employees are entitled to 20 working days of annual leave per calendar year. Part-time\nemployees receive annual leave on a pro-rata basis calculated against a 40-hour full-time week.\nNew employees are eligible for annual leave after completing 3 months of continuous\nemployment.\nAnnual leave accrues at a rate of 1.67 days per month of service.\nUnused annual leave of up to 10 days may be carried over to the next calendar year. Any\nbalance exceeding 10 days will lapse on December 31st.\nEmployees wishing to encash unused leave must submit a request to HR by November 30th. A\nmaximum of 5 days may be encashed per calendar year.\nAnnual leave must be applied at least 5 working days in advance through the HR portal.\nThe direct manager must approve leav\n\n\n\nSource: notice_period_policy.pdf\nChunk: 2\n\nContent:\n2. Employee Notice Period (Resignation)\nWhen an employee wishes to resign, the following notice periods apply based on the employee\ngrade:\nGrade 1-3 (Junior / Associate): 30 days (1 month)\nGrade 4-6 (Senior / Lead): 60 days (2 months)\nGrade 7-9 (Manager / Senior Manager): 90 days (3 months)\nGrade 10 and above (Director / VP / C-Suite): 90 days minimum, or as specified in the\nemployment contract.\nNotice periods begin on the date the written resignation is submitted and accepted by HR.\n\n\n\nSource: leave_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis policy outlines the types of leave available to ACME Corporation employees, the entitlements\nfor each leave type, and the procedures for applying and approving leave. This policy applies to all\nfull-time, part-time, and contract employees unless stated otherwise.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q5",
+      "taxonomy_mode": "exact_fact",
+      "question": "What is the grace period for arriving at work in the morning?",
+      "answer": "According to the attendance_policy.pdf, Chunk 3, the content states: \"A grace period of 10 minutes is allowed.\"",
+      "sources": [
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 7
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 5
+        }
+      ],
+      "retrieved_context": "Source: attendance_policy.pdf\nChunk: 3\n\nContent:\n3. Punctuality Requirements\nEmployees are expected to be present and ready to work at their workstation by 9:00 AM. A grace\nperiod of 10 minutes is allowed.\nArriving between 9:11 AM and 9:30 AM constitutes a late arrival and will be recorded.\nArriving after 9:30 AM constitutes a half-day absence for attendance purposes.\nThree recorded late arrivals in a calendar month will result in one day of LWP (Leave Without\nPay).\nRepeated late arrivals (more than 5 in a quarter) may trigger a formal performance discussion.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 3\n\nContent:\n3. Flexible Working Arrangements\nWith prior managerial approval, employees may adopt a flexible start time between 8:00 AM and\n10:00 AM, provided they complete 8 working hours daily and are available during core hours of\n10:00 AM to 4:00 PM.\nFlexible arrangements must be agreed upon formally and documented with HR.\nFlexible hours are not a right and may be withdrawn based on business requirements.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 4\n\nContent:\n4. Shift Work\nEmployees in operational roles may be assigned to shift-based schedules: Morning Shift (7:00 AM -\n3:00 PM), General Shift (9:00 AM - 6:00 PM), Afternoon Shift (2:00 PM - 10:00 PM), Night Shift\n(10:00 PM - 6:00 AM).\nShift assignments will be communicated at least 7 days in advance. Night shift employees receive a\n20% shift allowance on their base salary.\n\n\n\nSource: attendance_policy.pdf\nChunk: 7\n\nContent:\n7. Early Departure\nEmployees wishing to leave before 6:00 PM must obtain prior approval from their manager. Early\ndeparture without approval for more than 30 minutes constitutes a half-day absence.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 5\n\nContent:\n5. Expectations During WFH\nEmployees working from home are expected to be available and responsive during standard\nworking hours (9:00 AM to 6:00 PM), attend all scheduled meetings via video call with camera on\nunless technically infeasible, log into the company VPN and required systems by 9:15 AM, and mark\nattendance in the HR portal by 9:30 AM.\nMaintain the same level of productivity and output as in the office.\nEnsure confidentiality of company data in the home environment.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context contains the requested information, and the answer correctly answers from the context.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q6",
+      "taxonomy_mode": "multi_tier_penalties",
+      "question": "What happens if I am late to the office?",
+      "answer": "According to the attendance policy, arriving between 9:11 AM and 9:30 AM constitutes a late arrival and will be recorded. Arriving after 9:30 AM constitutes a half-day absence for attendance purposes.",
+      "sources": [
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 3
+        }
+      ],
+      "retrieved_context": "Source: attendance_policy.pdf\nChunk: 3\n\nContent:\n3. Punctuality Requirements\nEmployees are expected to be present and ready to work at their workstation by 9:00 AM. A grace\nperiod of 10 minutes is allowed.\nArriving between 9:11 AM and 9:30 AM constitutes a late arrival and will be recorded.\nArriving after 9:30 AM constitutes a half-day absence for attendance purposes.\nThree recorded late arrivals in a calendar month will result in one day of LWP (Leave Without\nPay).\nRepeated late arrivals (more than 5 in a quarter) may trigger a formal performance discussion.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "FAIL",
+      "agreement": false,
+      "error": null
+    },
+    {
+      "id": "Q7",
+      "taxonomy_mode": "multi_tier_penalties",
+      "question": "How is habitual absenteeism handled by HR?",
+      "answer": "According to the context, habitual absenteeism is handled as follows:\n\n* First occurrence: Verbal counselling by the line manager.\n* Second occurrence: Written warning issued by HR.\n* Third occurrence: Formal disciplinary proceedings in accordance with the Employee Conduct Policy.\n\nThis information can be found in Chunk 6 of the attendance_policy.pdf document.",
+      "sources": [
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 1
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 5
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 8
+        }
+      ],
+      "retrieved_context": "Source: attendance_policy.pdf\nChunk: 6\n\nContent:\n6. Habitual Absenteeism\nAn employee is considered habitually absent if they are absent for more than 6 days in a quarter\nwithout approved leave, or if their pattern of absence raises concern.\nFirst occurrence: Verbal counselling by the line manager.\nSecond occurrence: Written warning issued by HR.\nThird occurrence: Formal disciplinary proceedings in accordance with the Employee Conduct\nPolicy.\n\n\n\nSource: attendance_policy.pdf\nChunk: 4\n\nContent:\n4. Absence Reporting Procedure\nIf an employee is unable to attend work, they must notify their direct manager by phone or\nmessaging application before 9:00 AM on the day of absence, follow up with a formal leave\napplication in the HR portal within 24 hours, and provide a medical certificate for absences\nexceeding 2 consecutive working days.\nFailure to report an absence without prior authorization is classified as Absence Without Leave\n(AWOL) and may result in disciplinary action.\n\n\n\nSource: attendance_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Attendance Policy establishes standards for employee attendance, punctuality, and absence\nmanagement at ACME Corporation. Consistent attendance is essential for maintaining operational\nefficiency and meeting business objectives.\n\n\n\nSource: attendance_policy.pdf\nChunk: 5\n\nContent:\n5. Attendance Tracking\nAttendance is tracked through the biometric attendance system installed at all entry points.\nEmployees must swipe in and out each day. Remote and WFH employees must log attendance\nthrough the HR portal by 9:30 AM.\nMonthly attendance reports are generated by the HR system on the 1st of each month.\nDiscrepancies in attendance records must be reported to HR within 3 working days of the\nmonth-end.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 8\n\nContent:\n8. Review and Withdrawal\nWFH eligibility may be withdrawn if an employee's performance declines, attendance requirements\nare not met, or if business needs require full-time on-site presence. A minimum of 5 working days\nnotice will be provided before withdrawal.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": true,
+          "reason": "Valid policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q8",
+      "taxonomy_mode": "exact_fact",
+      "question": "Can I work from home and what is the weekly limit?",
+      "answer": "According to the provided HR policy documents, you can work from home and the weekly limit is 2 days per week. This is stated in the \"WFH Entitlement\" section of the work_from_home_policy.pdf (Chunk: 3).",
+      "sources": [
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 1
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 5
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 2
+        }
+      ],
+      "retrieved_context": "Source: work_from_home_policy.pdf\nChunk: 3\n\nContent:\n3. WFH Entitlement\nEligible employees may work from home for a maximum of 2 days per week. The default WFH days\nare Wednesday and Friday, unless otherwise approved by the department head.\nEmployees may not carry forward unused WFH days to the following week.\nWFH days during public holidays or annual leave periods are not replaced.\nDuring probationary periods (first 6 months), employees are not eligible for WFH arrangements.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 6\n\nContent:\n6. Maximum Working Hours\nNo employee shall work more than 48 hours in any single week without explicit written approval\nfrom HR and the department VP.\nEmployees are entitled to a mandatory rest period of at least 12 hours between shifts.\nConsecutive working days without a day off shall not exceed 6 days.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Work From Home (WFH) Policy defines the eligibility criteria, approval process, and\nexpectations for employees working remotely. The policy aims to balance business operational\nrequirements with employee flexibility and well-being.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 5\n\nContent:\n5. Expectations During WFH\nEmployees working from home are expected to be available and responsive during standard\nworking hours (9:00 AM to 6:00 PM), attend all scheduled meetings via video call with camera on\nunless technically infeasible, log into the company VPN and required systems by 9:15 AM, and mark\nattendance in the HR portal by 9:30 AM.\nMaintain the same level of productivity and output as in the office.\nEnsure confidentiality of company data in the home environment.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 2\n\nContent:\n2. Standard Working Hours\nThe standard working week for full-time employees consists of 40 paid hours, structured as 8 hours\nper day across 5 working days (Monday to Friday).\nCore hours: 9:00 AM to 6:00 PM\nLunch break: 1:00 PM to 2:00 PM (unpaid, 1 hour)\nShort breaks: Employees are entitled to two 15-minute breaks - one at 11:00 AM and one at\n4:00 PM.\nPart-time employees working hours are defined in their individual employment contracts.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": true,
+          "reason": "Valid policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context does not contain the requested information about the weekly limit, and the answer correctly states that the information is unavailable without inventing a policy.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q9",
+      "taxonomy_mode": "eligibility_conditions",
+      "question": "What are the eligibility requirements for remote work?",
+      "answer": "According to the context, the eligibility requirements for remote work are as follows:\n\n* Have completed at least 6 months of continuous employment with ACME Corporation.\n* Hold a role that can be performed remotely without impacting customer service or team operations.\n* Have a demonstrated track record of meeting performance targets and deadlines.\n* Have a suitable home working environment with reliable internet (minimum 10 Mbps) and a private workspace.\n* Roles that require physical presence (e.g., reception, facilities, on-site IT support) are excluded from WFH eligibility.\n\nThese requirements are outlined in Chunk 2 of the work_from_home_policy.pdf.",
+      "sources": [
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 1
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 5
+        }
+      ],
+      "retrieved_context": "Source: work_from_home_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Work From Home (WFH) Policy defines the eligibility criteria, approval process, and\nexpectations for employees working remotely. The policy aims to balance business operational\nrequirements with employee flexibility and well-being.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 2\n\nContent:\n2. Eligibility\nEmployees are eligible for WFH arrangements if they meet all of the following criteria:\nHave completed at least 6 months of continuous employment with ACME Corporation.\nHold a role that can be performed remotely without impacting customer service or team\noperations.\nHave a demonstrated track record of meeting performance targets and deadlines.\nHave a suitable home working environment with reliable internet (minimum 10 Mbps) and a\nprivate workspace.\nRoles that require physical presence (e.g., reception, facilities, on-site IT support) are excluded from\nWFH eligibility.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 3\n\nContent:\n3. Flexible Working Arrangements\nWith prior managerial approval, employees may adopt a flexible start time between 8:00 AM and\n10:00 AM, provided they complete 8 working hours daily and are available during core hours of\n10:00 AM to 4:00 PM.\nFlexible arrangements must be agreed upon formally and documented with HR.\nFlexible hours are not a right and may be withdrawn based on business requirements.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 3\n\nContent:\n3. WFH Entitlement\nEligible employees may work from home for a maximum of 2 days per week. The default WFH days\nare Wednesday and Friday, unless otherwise approved by the department head.\nEmployees may not carry forward unused WFH days to the following week.\nWFH days during public holidays or annual leave periods are not replaced.\nDuring probationary periods (first 6 months), employees are not eligible for WFH arrangements.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 5\n\nContent:\n5. Expectations During WFH\nEmployees working from home are expected to be available and responsive during standard\nworking hours (9:00 AM to 6:00 PM), attend all scheduled meetings via video call with camera on\nunless technically infeasible, log into the company VPN and required systems by 9:15 AM, and mark\nattendance in the HR portal by 9:30 AM.\nMaintain the same level of productivity and output as in the office.\nEnsure confidentiality of company data in the home environment.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": true,
+          "reason": "Valid policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context contains the requested information, and the answer correctly provides it.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q10",
+      "taxonomy_mode": "procedure_application",
+      "question": "How much advance notice is required to request a work from home day?",
+      "answer": "According to the context, employees must request WFH days at least 24 hours in advance through the HR portal.",
+      "sources": [
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 7
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 5
+        }
+      ],
+      "retrieved_context": "Source: work_from_home_policy.pdf\nChunk: 4\n\nContent:\n4. Approval Process\nEmployees must request WFH days at least 24 hours in advance through the HR portal.\nThe direct manager must approve or reject the request within the same business day.\nManagers may revoke approved WFH days with a minimum of 4 hours notice in cases of\noperational urgency.\n\nWFH arrangements can be suspended for the entire team during critical business periods such\nas quarter-end reporting, audits, or major product launches.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 3\n\nContent:\n3. WFH Entitlement\nEligible employees may work from home for a maximum of 2 days per week. The default WFH days\nare Wednesday and Friday, unless otherwise approved by the department head.\nEmployees may not carry forward unused WFH days to the following week.\nWFH days during public holidays or annual leave periods are not replaced.\nDuring probationary periods (first 6 months), employees are not eligible for WFH arrangements.\n\n\n\nSource: attendance_policy.pdf\nChunk: 7\n\nContent:\n7. Early Departure\nEmployees wishing to leave before 6:00 PM must obtain prior approval from their manager. Early\ndeparture without approval for more than 30 minutes constitutes a half-day absence.\n\n\n\nSource: attendance_policy.pdf\nChunk: 3\n\nContent:\n3. Punctuality Requirements\nEmployees are expected to be present and ready to work at their workstation by 9:00 AM. A grace\nperiod of 10 minutes is allowed.\nArriving between 9:11 AM and 9:30 AM constitutes a late arrival and will be recorded.\nArriving after 9:30 AM constitutes a half-day absence for attendance purposes.\nThree recorded late arrivals in a calendar month will result in one day of LWP (Leave Without\nPay).\nRepeated late arrivals (more than 5 in a quarter) may trigger a formal performance discussion.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 5\n\nContent:\n5. Expectations During WFH\nEmployees working from home are expected to be available and responsive during standard\nworking hours (9:00 AM to 6:00 PM), attend all scheduled meetings via video call with camera on\nunless technically infeasible, log into the company VPN and required systems by 9:15 AM, and mark\nattendance in the HR portal by 9:30 AM.\nMaintain the same level of productivity and output as in the office.\nEnsure confidentiality of company data in the home environment.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q11",
+      "taxonomy_mode": "exact_fact",
+      "question": "What are the core working hours and break timings?",
+      "answer": "Based on the provided HR policy documents, the core working hours are:\n\n* 9:00 AM to 6:00 PM\n\nAnd the break timings are:\n\n* Lunch break: 1:00 PM to 2:00 PM (unpaid, 1 hour)\n* Short breaks: Employees are entitled to two 15-minute breaks - one at 11:00 AM and one at 4:00 PM.",
+      "sources": [
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 5
+        }
+      ],
+      "retrieved_context": "Source: working_hours_policy.pdf\nChunk: 2\n\nContent:\n2. Standard Working Hours\nThe standard working week for full-time employees consists of 40 paid hours, structured as 8 hours\nper day across 5 working days (Monday to Friday).\nCore hours: 9:00 AM to 6:00 PM\nLunch break: 1:00 PM to 2:00 PM (unpaid, 1 hour)\nShort breaks: Employees are entitled to two 15-minute breaks - one at 11:00 AM and one at\n4:00 PM.\nPart-time employees working hours are defined in their individual employment contracts.\n\n\n\nSource: attendance_policy.pdf\nChunk: 2\n\nContent:\n2. Standard Working Hours\nThe standard working hours for all full-time employees are 9:00 AM to 6:00 PM, Monday through\nFriday, with a one-hour lunch break from 1:00 PM to 2:00 PM. Total paid working hours are 8 hours\nper day, 40 hours per week.\nEmployees in shift-based roles will follow their designated shift schedule as communicated by their\ndepartment head.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 3\n\nContent:\n3. Flexible Working Arrangements\nWith prior managerial approval, employees may adopt a flexible start time between 8:00 AM and\n10:00 AM, provided they complete 8 working hours daily and are available during core hours of\n10:00 AM to 4:00 PM.\nFlexible arrangements must be agreed upon formally and documented with HR.\nFlexible hours are not a right and may be withdrawn based on business requirements.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 6\n\nContent:\n6. Maximum Working Hours\nNo employee shall work more than 48 hours in any single week without explicit written approval\nfrom HR and the department VP.\nEmployees are entitled to a mandatory rest period of at least 12 hours between shifts.\nConsecutive working days without a day off shall not exceed 6 days.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 5\n\nContent:\n5. Expectations During WFH\nEmployees working from home are expected to be available and responsive during standard\nworking hours (9:00 AM to 6:00 PM), attend all scheduled meetings via video call with camera on\nunless technically infeasible, log into the company VPN and required systems by 9:15 AM, and mark\nattendance in the HR portal by 9:30 AM.\nMaintain the same level of productivity and output as in the office.\nEnsure confidentiality of company data in the home environment.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q12",
+      "taxonomy_mode": "exact_fact",
+      "question": "What is the shift allowance for employees working the night shift?",
+      "answer": "According to the provided HR policy documents, specifically Chunk 4 of the \"working_hours_policy.pdf\" document, Night shift employees receive a 20% shift allowance on their base salary.",
+      "sources": [
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 1
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 8
+        }
+      ],
+      "retrieved_context": "Source: working_hours_policy.pdf\nChunk: 4\n\nContent:\n4. Shift Work\nEmployees in operational roles may be assigned to shift-based schedules: Morning Shift (7:00 AM -\n3:00 PM), General Shift (9:00 AM - 6:00 PM), Afternoon Shift (2:00 PM - 10:00 PM), Night Shift\n(10:00 PM - 6:00 AM).\nShift assignments will be communicated at least 7 days in advance. Night shift employees receive a\n20% shift allowance on their base salary.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 6\n\nContent:\n6. Maximum Working Hours\nNo employee shall work more than 48 hours in any single week without explicit written approval\nfrom HR and the department VP.\nEmployees are entitled to a mandatory rest period of at least 12 hours between shifts.\nConsecutive working days without a day off shall not exceed 6 days.\n\n\n\nSource: attendance_policy.pdf\nChunk: 2\n\nContent:\n2. Standard Working Hours\nThe standard working hours for all full-time employees are 9:00 AM to 6:00 PM, Monday through\nFriday, with a one-hour lunch break from 1:00 PM to 2:00 PM. Total paid working hours are 8 hours\nper day, 40 hours per week.\nEmployees in shift-based roles will follow their designated shift schedule as communicated by their\ndepartment head.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Working Hours Policy establishes the standard hours of work, shift arrangements, break\nentitlements, and overtime management for all employees of ACME Corporation.\n\n\n\nSource: leave_policy.pdf\nChunk: 8\n\nContent:\n7. Leave Without Pay (LWP)\nEmployees who have exhausted their entitled leave and require additional time off may apply for\nLWP. LWP is granted at the discretion of the department head and HR and will result in a salary\ndeduction for the period of absence.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q13",
+      "taxonomy_mode": "calculation_rule",
+      "question": "How is overtime work compensated for non-exempt employees?",
+      "answer": "According to the provided HR policy documents, overtime work for non-exempt employees is compensated at 1.5x the hourly rate for weekdays and 2.0x for weekend and public holiday work.",
+      "sources": [
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 5
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 1
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 10
+        }
+      ],
+      "retrieved_context": "Source: working_hours_policy.pdf\nChunk: 5\n\nContent:\n5. Overtime\n\nOvertime is defined as any work performed beyond 40 hours in a standard week or beyond 8 hours\nin a standard day.\nAll overtime must be pre-approved in writing by the employee's department head.\nFor non-exempt employees, overtime is compensated at 1.5x the hourly rate for weekdays and\n2.0x for weekend and public holiday work.\nExempt (managerial) employees receive compensatory leave at a 1:1 ratio for overtime worked.\nOvertime exceeding 12 hours in a single day is not permitted except in emergencies with\nVP-level approval.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Working Hours Policy establishes the standard hours of work, shift arrangements, break\nentitlements, and overtime management for all employees of ACME Corporation.\n\n\n\nSource: leave_policy.pdf\nChunk: 10\n\nContent:\n9. Policy Review\nThis policy will be reviewed annually by the HR Department. Any amendments will be\ncommunicated to all employees via the intranet and HR portal.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": true,
+          "reason": "Valid policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q14",
+      "taxonomy_mode": "procedure_application",
+      "question": "How and within how many days should workplace harassment be reported?",
+      "answer": "According to the context, employees who witness or experience harassment must report it to HR or the designated Internal Complaints Committee (ICC) within 30 days.",
+      "sources": [
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 9
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 4
+        }
+      ],
+      "retrieved_context": "Source: employee_conduct_policy.pdf\nChunk: 3\n\nContent:\n3. Workplace Harassment and Discrimination\nACME Corporation has a zero-tolerance policy towards any form of harassment, discrimination, or\nbullying in the workplace, including physical, verbal, psychological, or cyber harassment.\nHarassment based on gender, race, religion, caste, disability, age, or sexual orientation will\nresult in immediate disciplinary action, up to and including termination.\nEmployees who witness or experience harassment must report it to HR or the designated\nInternal Complaints Committee (ICC) within 30 days.\nAll complaints will be investigated confidentially and impartially.\n\n\n\nSource: employee_conduct_policy.pdf\nChunk: 9\n\nContent:\n9. Grievance Process\nEmployees who believe they have been treated unfairly have the right to raise a formal grievance.\nThe grievance must be submitted in writing to HR within 30 days of the incident. HR will\nacknowledge receipt within 5 working days and complete the investigation within 30 working days.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT\n\n\n\nSource: attendance_policy.pdf\nChunk: 4\n\nContent:\n4. Absence Reporting Procedure\nIf an employee is unable to attend work, they must notify their direct manager by phone or\nmessaging application before 9:00 AM on the day of absence, follow up with a formal leave\napplication in the HR portal within 24 hours, and provide a medical certificate for absences\nexceeding 2 consecutive working days.\nFailure to report an absence without prior authorization is classified as Absence Without Leave\n(AWOL) and may result in disciplinary action.\n\n\n\nSource: attendance_policy.pdf\nChunk: 6\n\nContent:\n6. Habitual Absenteeism\nAn employee is considered habitually absent if they are absent for more than 6 days in a quarter\nwithout approved leave, or if their pattern of absence raises concern.\nFirst occurrence: Verbal counselling by the line manager.\nSecond occurrence: Written warning issued by HR.\nThird occurrence: Formal disciplinary proceedings in accordance with the Employee Conduct\nPolicy.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 4\n\nContent:\n4. Approval Process\nEmployees must request WFH days at least 24 hours in advance through the HR portal.\nThe direct manager must approve or reject the request within the same business day.\nManagers may revoke approved WFH days with a minimum of 4 hours notice in cases of\noperational urgency.\n\nWFH arrangements can be suspended for the entire team during critical business periods such\nas quarter-end reporting, audits, or major product launches.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly states the information required to answer the question, which is supported by the policy context.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q15",
+      "taxonomy_mode": "exact_fact",
+      "question": "What is the threshold value for disclosing gifts received from clients or vendors?",
+      "answer": "I don't know based on the provided HR policy documents.",
+      "sources": [],
+      "retrieved_context": "",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": true,
+          "reason": "Unsupported-policy refusal detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The supplied policy context does not contain the requested information, and the answer correctly states that the information is unavailable without inventing a policy.",
+      "human_label": "FAIL",
+      "agreement": false,
+      "error": null
+    },
+    {
+      "id": "Q16",
+      "taxonomy_mode": "multi_tier_penalties",
+      "question": "What are the progressive steps in the company disciplinary process?",
+      "answer": "Based on the provided HR policy documents, the progressive steps in the company disciplinary process are:\n\n1. Verbal Warning - for minor first-time offences.\n2. Written Warning - for repeated minor offences or a first moderate offence.\n3. Final Written Warning and Performance Improvement Plan (PIP).\n4. Termination of employment for serious misconduct or repeated policy violations.\n\nThese steps are outlined in the \"Disciplinary Process\" section of the employee conduct policy (Chunk 8).",
+      "sources": [
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 7
+        },
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 9
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 1
+        }
+      ],
+      "retrieved_context": "Source: employee_conduct_policy.pdf\nChunk: 8\n\nContent:\n8. Disciplinary Process\nViolations of this policy will be addressed through ACME Corporation's progressive disciplinary\nprocess:\nStep 1: Verbal Warning - for minor first-time offences.\nStep 2: Written Warning - for repeated minor offences or a first moderate offence.\nStep 3: Final Written Warning and Performance Improvement Plan (PIP).\nStep 4: Termination of employment for serious misconduct or repeated policy violations.\nSerious misconduct (e.g., fraud, physical violence, data theft) may result in immediate termination\nwithout prior warnings, subject to a fair investigation.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 7\n\nContent:\n7. Immediate Termination (For Cause)\nIn cases of serious misconduct as defined in the Employee Conduct Policy, ACME Corporation\nreserves the right to terminate employment with immediate effect and without notice. No payment in\nlieu of notice will be provided in such cases.\nExamples of serious misconduct include fraud, theft, workplace violence, and gross insubordination.\n\n\n\nSource: employee_conduct_policy.pdf\nChunk: 9\n\nContent:\n9. Grievance Process\nEmployees who believe they have been treated unfairly have the right to raise a formal grievance.\nThe grievance must be submitted in writing to HR within 30 days of the incident. HR will\nacknowledge receipt within 5 working days and complete the investigation within 30 working days.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT\n\n\n\nSource: notice_period_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Notice Period Policy defines the notice periods applicable to employees and ACME\nCorporation upon resignation or termination of employment. The policy ensures a smooth transition\nand continuity of business operations.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": true,
+          "reason": "Valid policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q17",
+      "taxonomy_mode": "multi_condition_matrix",
+      "question": "What is the notice period for employee resignation across different grades?",
+      "answer": "According to the context from the \"notice_period_policy.pdf\" document, Chunk 2, the notice period for employee resignation across different grades is:\n\n* Grade 1-3 (Junior / Associate): 30 days (1 month)\n* Grade 4-6 (Senior / Lead): 60 days (2 months)\n* Grade 7-9 (Manager / Senior Manager): 90 days (3 months)\n* Grade 10 and above (Director / VP / C-Suite): 90 days minimum, or as specified in the employment contract.\n\nNote: The notice period begins on the date the written resignation is submitted and accepted by HR.",
+      "sources": [
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 1
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 8
+        }
+      ],
+      "retrieved_context": "Source: notice_period_policy.pdf\nChunk: 2\n\nContent:\n2. Employee Notice Period (Resignation)\nWhen an employee wishes to resign, the following notice periods apply based on the employee\ngrade:\nGrade 1-3 (Junior / Associate): 30 days (1 month)\nGrade 4-6 (Senior / Lead): 60 days (2 months)\nGrade 7-9 (Manager / Senior Manager): 90 days (3 months)\nGrade 10 and above (Director / VP / C-Suite): 90 days minimum, or as specified in the\nemployment contract.\nNotice periods begin on the date the written resignation is submitted and accepted by HR.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Notice Period Policy defines the notice periods applicable to employees and ACME\nCorporation upon resignation or termination of employment. The policy ensures a smooth transition\nand continuity of business operations.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 3\n\nContent:\n3. Employer Notice Period (Termination Without Cause)\nWhen ACME Corporation terminates an employee without cause, the following notice periods apply:\nEmployees with less than 1 year of service: 30 days or payment in lieu.\nEmployees with 1-3 years of service: 60 days or payment in lieu.\nEmployees with more than 3 years of service: 90 days or payment in lieu.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 6\n\nContent:\n6. Knowledge Transfer Obligations\nDuring the notice period, employees are required to document ongoing projects, workflows, and key\ncontacts, provide training to the replacement employee or team member, return all company\nproperty (laptop, access cards, keys) to IT and Admin, and ensure all company data is transferred to\nappropriate shared drives.\nFailure to complete adequate knowledge transfer may impact the Full and Final (F&F;) settlement.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 8\n\nContent:\n8. Review and Withdrawal\nWFH eligibility may be withdrawn if an employee's performance declines, attendance requirements\nare not met, or if business needs require full-time on-site presence. A minimum of 5 working days\nnotice will be provided before withdrawal.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": true,
+          "reason": "Numeric notice-period figure found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q18",
+      "taxonomy_mode": "calculation_rule",
+      "question": "How is the notice period buyout amount calculated for early exit?",
+      "answer": "According to the context, the notice period buyout amount is calculated as: (Basic Salary / 30) x Number of days not served.",
+      "sources": [
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 7
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 1
+        }
+      ],
+      "retrieved_context": "Source: notice_period_policy.pdf\nChunk: 4\n\nContent:\n4. Notice Period Buyout\nEmployees who wish to leave before completing the full notice period may apply for an early exit by\npaying a notice period buyout to the company.\nThe buyout amount is calculated as: (Basic Salary / 30) x Number of days not served.\nBuyout requests must be submitted in writing to HR and require approval from the department\nhead and HR Director.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 2\n\nContent:\n2. Employee Notice Period (Resignation)\nWhen an employee wishes to resign, the following notice periods apply based on the employee\ngrade:\nGrade 1-3 (Junior / Associate): 30 days (1 month)\nGrade 4-6 (Senior / Lead): 60 days (2 months)\nGrade 7-9 (Manager / Senior Manager): 90 days (3 months)\nGrade 10 and above (Director / VP / C-Suite): 90 days minimum, or as specified in the\nemployment contract.\nNotice periods begin on the date the written resignation is submitted and accepted by HR.\n\n\n\nSource: attendance_policy.pdf\nChunk: 7\n\nContent:\n7. Early Departure\nEmployees wishing to leave before 6:00 PM must obtain prior approval from their manager. Early\ndeparture without approval for more than 30 minutes constitutes a half-day absence.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 3\n\nContent:\n3. Employer Notice Period (Termination Without Cause)\nWhen ACME Corporation terminates an employee without cause, the following notice periods apply:\nEmployees with less than 1 year of service: 30 days or payment in lieu.\nEmployees with 1-3 years of service: 60 days or payment in lieu.\nEmployees with more than 3 years of service: 90 days or payment in lieu.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Notice Period Policy defines the notice periods applicable to employees and ACME\nCorporation upon resignation or termination of employment. The policy ensures a smooth transition\nand continuity of business operations.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No numeric notice-period figure found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q19",
+      "taxonomy_mode": "procedure_application",
+      "question": "What is the timeline for processing the Full and Final settlement after leaving?",
+      "answer": "According to the notice_period_policy.pdf, Chunk: 8, the Full and Final settlement will be processed within 45 working days of the last working day, subject to completion of all exit formalities.",
+      "sources": [
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 9
+        }
+      ],
+      "retrieved_context": "Source: notice_period_policy.pdf\nChunk: 8\n\nContent:\n8. Full and Final Settlement\nThe Full and Final (F&F;) settlement will be processed within 45 working days of the last working\nday, subject to completion of all exit formalities.\nF&F; includes: salary for days worked, encashable leave balance, approved reimbursements,\nand gratuity (as per the Payment of Gratuity Act, for employees with 5+ years of service).\nF&F; will be withheld or adjusted for outstanding loans, notice period buyout, or any dues owed\nto the company.\n\n\n\nSource: employee_conduct_policy.pdf\nChunk: 8\n\nContent:\n8. Disciplinary Process\nViolations of this policy will be addressed through ACME Corporation's progressive disciplinary\nprocess:\nStep 1: Verbal Warning - for minor first-time offences.\nStep 2: Written Warning - for repeated minor offences or a first moderate offence.\nStep 3: Final Written Warning and Performance Improvement Plan (PIP).\nStep 4: Termination of employment for serious misconduct or repeated policy violations.\nSerious misconduct (e.g., fraud, physical violence, data theft) may result in immediate termination\nwithout prior warnings, subject to a fair investigation.\n\n\n\nSource: employee_conduct_policy.pdf\nChunk: 9\n\nContent:\n9. Grievance Process\nEmployees who believe they have been treated unfairly have the right to raise a formal grievance.\nThe grievance must be submitted in writing to HR within 30 days of the incident. HR will\nacknowledge receipt within 5 working days and complete the investigation within 30 working days.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No numeric notice-period figure found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context contains the requested information, and the answer correctly answers the question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q20",
+      "taxonomy_mode": "eligibility_conditions",
+      "question": "How many paid sick leave days are employees entitled to per year and can unused sick leave be carried over?",
+      "answer": "According to the context, employees are entitled to 12 days of paid sick leave per calendar year. Additionally, unused sick leave cannot be carried over or encashed.",
+      "sources": [
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 8
+        }
+      ],
+      "retrieved_context": "Source: leave_policy.pdf\nChunk: 4\n\nContent:\n3. Sick Leave\nFull-time employees are entitled to 12 days of paid sick leave per calendar year. Sick leave does not\naccrue and unused sick leave cannot be carried over or encashed.\nFor absences of 1-2 days, employees must notify their manager by 9:00 AM on the first day of\nabsence.\nFor absences exceeding 2 consecutive days, a medical certificate from a registered medical\npractitioner must be submitted.\nEmployees who exhaust their sick leave entitlement may apply for unpaid leave with managerial\napproval.\nRepeated or patterned sick leave usage may be subject to a formal attendance review.\n\n\n\nSource: leave_policy.pdf\nChunk: 2\n\nContent:\n2. Annual Leave (Vacation Leave)\nAll full-time employees are entitled to 20 working days of annual leave per calendar year. Part-time\nemployees receive annual leave on a pro-rata basis calculated against a 40-hour full-time week.\nNew employees are eligible for annual leave after completing 3 months of continuous\nemployment.\nAnnual leave accrues at a rate of 1.67 days per month of service.\nUnused annual leave of up to 10 days may be carried over to the next calendar year. Any\nbalance exceeding 10 days will lapse on December 31st.\nEmployees wishing to encash unused leave must submit a request to HR by November 30th. A\nmaximum of 5 days may be encashed per calendar year.\nAnnual leave must be applied at least 5 working days in advance through the HR portal.\nThe direct manager must approve leav\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 3\n\nContent:\n3. WFH Entitlement\nEligible employees may work from home for a maximum of 2 days per week. The default WFH days\nare Wednesday and Friday, unless otherwise approved by the department head.\nEmployees may not carry forward unused WFH days to the following week.\nWFH days during public holidays or annual leave periods are not replaced.\nDuring probationary periods (first 6 months), employees are not eligible for WFH arrangements.\n\n\n\nSource: leave_policy.pdf\nChunk: 8\n\nContent:\n7. Leave Without Pay (LWP)\nEmployees who have exhausted their entitled leave and require additional time off may apply for\nLWP. LWP is granted at the discretion of the department head and HR and will result in a salary\ndeduction for the period of absence.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 8\n\nContent:\n8. Public Holidays\nEmployees are entitled to all public holidays as declared by the Government of India and as\npublished in the company's annual holiday calendar. Employees required to work on public holidays\nwill receive a compensatory day off.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly states that unused sick leave cannot be carried over or encashed, which is supported by the policy context.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q21",
+      "taxonomy_mode": "eligibility_conditions",
+      "question": "What is the minimum internet speed requirement for eligible employees to work from home?",
+      "answer": "According to the provided HR policy documents, the minimum internet speed requirement for eligible employees to work from home is 10 Mbps.",
+      "sources": [
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 1
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 5
+        }
+      ],
+      "retrieved_context": "Source: work_from_home_policy.pdf\nChunk: 2\n\nContent:\n2. Eligibility\nEmployees are eligible for WFH arrangements if they meet all of the following criteria:\nHave completed at least 6 months of continuous employment with ACME Corporation.\nHold a role that can be performed remotely without impacting customer service or team\noperations.\nHave a demonstrated track record of meeting performance targets and deadlines.\nHave a suitable home working environment with reliable internet (minimum 10 Mbps) and a\nprivate workspace.\nRoles that require physical presence (e.g., reception, facilities, on-site IT support) are excluded from\nWFH eligibility.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Work From Home (WFH) Policy defines the eligibility criteria, approval process, and\nexpectations for employees working remotely. The policy aims to balance business operational\nrequirements with employee flexibility and well-being.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 5\n\nContent:\n5. Expectations During WFH\nEmployees working from home are expected to be available and responsive during standard\nworking hours (9:00 AM to 6:00 PM), attend all scheduled meetings via video call with camera on\nunless technically infeasible, log into the company VPN and required systems by 9:15 AM, and mark\nattendance in the HR portal by 9:30 AM.\nMaintain the same level of productivity and output as in the office.\nEnsure confidentiality of company data in the home environment.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context contains the requested information, and the answer correctly answers the question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q22",
+      "taxonomy_mode": "procedure_application",
+      "question": "Can a manager revoke an approved work from home day in an operational emergency, and what notice is required?",
+      "answer": "According to the provided HR policy documents (Chunk 4), managers may revoke approved WFH days with a minimum of 4 hours notice in cases of operational urgency.",
+      "sources": [
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 8
+        }
+      ],
+      "retrieved_context": "Source: work_from_home_policy.pdf\nChunk: 4\n\nContent:\n4. Approval Process\nEmployees must request WFH days at least 24 hours in advance through the HR portal.\nThe direct manager must approve or reject the request within the same business day.\nManagers may revoke approved WFH days with a minimum of 4 hours notice in cases of\noperational urgency.\n\nWFH arrangements can be suspended for the entire team during critical business periods such\nas quarter-end reporting, audits, or major product launches.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 3\n\nContent:\n3. WFH Entitlement\nEligible employees may work from home for a maximum of 2 days per week. The default WFH days\nare Wednesday and Friday, unless otherwise approved by the department head.\nEmployees may not carry forward unused WFH days to the following week.\nWFH days during public holidays or annual leave periods are not replaced.\nDuring probationary periods (first 6 months), employees are not eligible for WFH arrangements.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 8\n\nContent:\n8. Review and Withdrawal\nWFH eligibility may be withdrawn if an employee's performance declines, attendance requirements\nare not met, or if business needs require full-time on-site presence. A minimum of 5 working days\nnotice will be provided before withdrawal.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No numeric notice-period figure found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q23",
+      "taxonomy_mode": "exact_fact",
+      "question": "How long does the NDA obligation continue after employment ends?",
+      "answer": "According to the provided HR policy documents, the NDA obligation continues for 2 years post-employment. This information can be found in the \"Confidentiality and Data Protection\" policy (employee_conduct_policy.pdf, Chunk 5).",
+      "sources": [
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 5
+        },
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 1
+        }
+      ],
+      "retrieved_context": "Source: employee_conduct_policy.pdf\nChunk: 5\n\nContent:\n5. Confidentiality and Data Protection\n\nEmployees are required to protect confidential company information including customer data,\nfinancial records, trade secrets, and internal processes.\nSharing confidential information with unauthorised parties is a serious violation.\nEmployees must sign a Non-Disclosure Agreement (NDA) upon joining. The obligation\ncontinues for 2 years post-employment.\n\n\n\nSource: notice_period_policy.pdf\nChunk: 3\n\nContent:\n3. Employer Notice Period (Termination Without Cause)\nWhen ACME Corporation terminates an employee without cause, the following notice periods apply:\nEmployees with less than 1 year of service: 30 days or payment in lieu.\nEmployees with 1-3 years of service: 60 days or payment in lieu.\nEmployees with more than 3 years of service: 90 days or payment in lieu.\n\n\n\nSource: attendance_policy.pdf\nChunk: 8\n\nContent:\n8. Overtime and Compensatory Off\nOvertime work beyond standard hours must be pre-approved by the department head. Employees\nwho work overtime will receive compensatory leave (comp-off) at a 1:1 ratio, to be utilised within 60\ndays. Overtime pay in lieu of comp-off requires VP-level approval.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 8\n\nContent:\n8. Review and Withdrawal\nWFH eligibility may be withdrawn if an employee's performance declines, attendance requirements\nare not met, or if business needs require full-time on-site presence. A minimum of 5 working days\nnotice will be provided before withdrawal.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT\n\n\n\nSource: leave_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis policy outlines the types of leave available to ACME Corporation employees, the entitlements\nfor each leave type, and the procedures for applying and approving leave. This policy applies to all\nfull-time, part-time, and contract employees unless stated otherwise.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": true,
+          "reason": "Valid policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context does not contain the requested information, and the answer correctly states that the information is unavailable without inventing a policy.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q24",
+      "taxonomy_mode": "procedure_application",
+      "question": "Within how many working days must a potential conflict of interest be disclosed to HR?",
+      "answer": "According to the provided HR policy documents, a potential conflict of interest must be disclosed to HR within 5 working days. This is stated in Chunk 4 of the employee_conduct_policy.pdf document.",
+      "sources": [
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 4
+        },
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 9
+        },
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 3
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "work_from_home_policy.pdf",
+          "chunk": 4
+        }
+      ],
+      "retrieved_context": "Source: employee_conduct_policy.pdf\nChunk: 4\n\nContent:\n4. Conflict of Interest\nEmployees must avoid situations where their personal interests conflict with the interests of the\ncompany.\nEmployees must disclose any potential conflict of interest to HR in writing within 5 working days.\nEngaging in external employment or business ventures that compete with ACME Corporation is\nprohibited without prior written approval.\nAccepting gifts from vendors or clients above a value of INR 1,000 must be disclosed to HR.\n\n\n\nSource: employee_conduct_policy.pdf\nChunk: 9\n\nContent:\n9. Grievance Process\nEmployees who believe they have been treated unfairly have the right to raise a formal grievance.\nThe grievance must be submitted in writing to HR within 30 days of the incident. HR will\nacknowledge receipt within 5 working days and complete the investigation within 30 working days.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT\n\n\n\nSource: leave_policy.pdf\nChunk: 3\n\nContent:\nplied at least 5 working days in advance through the HR portal.\nThe direct manager must approve leave requests within 2 working days of submission.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 6\n\nContent:\n6. Maximum Working Hours\nNo employee shall work more than 48 hours in any single week without explicit written approval\nfrom HR and the department VP.\nEmployees are entitled to a mandatory rest period of at least 12 hours between shifts.\nConsecutive working days without a day off shall not exceed 6 days.\n\n\n\nSource: work_from_home_policy.pdf\nChunk: 4\n\nContent:\n4. Approval Process\nEmployees must request WFH days at least 24 hours in advance through the HR portal.\nThe direct manager must approve or reject the request within the same business day.\nManagers may revoke approved WFH days with a minimum of 4 hours notice in cases of\noperational urgency.\n\nWFH arrangements can be suspended for the entire team during critical business periods such\nas quarter-end reporting, audits, or major product launches.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": true,
+          "reason": "Valid policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The context does not contain the requested information, and the answer correctly states that it is unavailable without inventing a policy.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q25",
+      "taxonomy_mode": "calculation_rule",
+      "question": "What is the overtime rate for non-exempt employees working on weekends or public holidays?",
+      "answer": "According to the context in Chunk 5 of the working_hours_policy.pdf, for non-exempt employees, overtime is compensated at 2.0x the hourly rate for weekend and public holiday work.",
+      "sources": [
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 5
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 1
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 8
+        },
+        {
+          "source": "working_hours_policy.pdf",
+          "chunk": 2
+        },
+        {
+          "source": "attendance_policy.pdf",
+          "chunk": 2
+        }
+      ],
+      "retrieved_context": "Source: working_hours_policy.pdf\nChunk: 5\n\nContent:\n5. Overtime\n\nOvertime is defined as any work performed beyond 40 hours in a standard week or beyond 8 hours\nin a standard day.\nAll overtime must be pre-approved in writing by the employee's department head.\nFor non-exempt employees, overtime is compensated at 1.5x the hourly rate for weekdays and\n2.0x for weekend and public holiday work.\nExempt (managerial) employees receive compensatory leave at a 1:1 ratio for overtime worked.\nOvertime exceeding 12 hours in a single day is not permitted except in emergencies with\nVP-level approval.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 1\n\nContent:\n1. Purpose\nThis Working Hours Policy establishes the standard hours of work, shift arrangements, break\nentitlements, and overtime management for all employees of ACME Corporation.\n\n\n\nSource: working_hours_policy.pdf\nChunk: 8\n\nContent:\n8. Public Holidays\nEmployees are entitled to all public holidays as declared by the Government of India and as\npublished in the company's annual holiday calendar. Employees required to work on public holidays\nwill receive a compensatory day off.\n (C) 2024 ACME Corporation - Human Resources Department - SAMPLE DOCUMENT\n\n\n\nSource: working_hours_policy.pdf\nChunk: 2\n\nContent:\n2. Standard Working Hours\nThe standard working week for full-time employees consists of 40 paid hours, structured as 8 hours\nper day across 5 working days (Monday to Friday).\nCore hours: 9:00 AM to 6:00 PM\nLunch break: 1:00 PM to 2:00 PM (unpaid, 1 hour)\nShort breaks: Employees are entitled to two 15-minute breaks - one at 11:00 AM and one at\n4:00 PM.\nPart-time employees working hours are defined in their individual employment contracts.\n\n\n\nSource: attendance_policy.pdf\nChunk: 2\n\nContent:\n2. Standard Working Hours\nThe standard working hours for all full-time employees are 9:00 AM to 6:00 PM, Monday through\nFriday, with a one-hour lunch break from 1:00 PM to 2:00 PM. Total paid working hours are 8 hours\nper day, 40 hours per week.\nEmployees in shift-based roles will follow their designated shift schedule as communicated by their\ndepartment head.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": true,
+          "reason": "Valid policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q27",
+      "taxonomy_mode": "multi_tier_penalties",
+      "question": "What happens if an employee fails to complete adequate knowledge transfer during the notice period?",
+      "answer": "According to the context, if an employee fails to complete adequate knowledge transfer during the notice period, it may impact the Full and Final (F&F;) settlement.",
+      "sources": [
+        {
+          "source": "notice_period_policy.pdf",
+          "chunk": 6
+        },
+        {
+          "source": "employee_conduct_policy.pdf",
+          "chunk": 8
+        }
+      ],
+      "retrieved_context": "Source: notice_period_policy.pdf\nChunk: 6\n\nContent:\n6. Knowledge Transfer Obligations\nDuring the notice period, employees are required to document ongoing projects, workflows, and key\ncontacts, provide training to the replacement employee or team member, return all company\nproperty (laptop, access cards, keys) to IT and Admin, and ensure all company data is transferred to\nappropriate shared drives.\nFailure to complete adequate knowledge transfer may impact the Full and Final (F&F;) settlement.\n\n\n\nSource: employee_conduct_policy.pdf\nChunk: 8\n\nContent:\n8. Disciplinary Process\nViolations of this policy will be addressed through ACME Corporation's progressive disciplinary\nprocess:\nStep 1: Verbal Warning - for minor first-time offences.\nStep 2: Written Warning - for repeated minor offences or a first moderate offence.\nStep 3: Final Written Warning and Performance Improvement Plan (PIP).\nStep 4: Termination of employment for serious misconduct or repeated policy violations.\nSerious misconduct (e.g., fraud, physical violence, data theft) may result in immediate termination\nwithout prior warnings, subject to a fair investigation.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No numeric notice-period figure found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": false,
+          "reason": "No refusal pattern detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The answer correctly answers the user's question using the provided policy context without introducing unsupported claims.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    },
+    {
+      "id": "Q28",
+      "taxonomy_mode": "unanswerable_fallback",
+      "question": "Does the company provide pet leave or pawternity leave?",
+      "answer": "I don't know based on the provided HR policy documents.",
+      "sources": [
+        {
+          "source": "leave_policy.pdf",
+          "chunk": 5
+        }
+      ],
+      "retrieved_context": "Source: leave_policy.pdf\nChunk: 5\n\nContent:\n4. Maternity and Paternity Leave\n\nEligible female employees are entitled to 26 weeks of paid maternity leave for the first two live\nbirths. The leave may commence 8 weeks before the expected date of delivery.\nMale employees are entitled to 5 working days of paid paternity leave within 30 days of the birth of a\nchild.\nEmployees must notify HR at least 12 weeks before the expected start of maternity leave.\nSupporting documentation (expected delivery date from a registered doctor) must be submitted\nto HR.",
+      "assertions": {
+        "policy_section_reference": {
+          "passed": false,
+          "reason": "No policy section reference found"
+        },
+        "handbook_version_citation": {
+          "passed": false,
+          "reason": "Handbook version citation missing"
+        },
+        "notice_period_numeric": {
+          "passed": false,
+          "reason": "No notice-period language found"
+        },
+        "out_of_jurisdiction_refusal": {
+          "passed": true,
+          "reason": "Unsupported-policy refusal detected"
+        }
+      },
+      "judge_verdict": "PASS",
+      "judge_reason": "The supplied policy context does not contain information about pet leave, and the answer correctly states that the information is unavailable without inventing a policy.",
+      "human_label": "PASS",
+      "agreement": true,
+      "error": null
+    }
+  ],
+  "errors": []
+}

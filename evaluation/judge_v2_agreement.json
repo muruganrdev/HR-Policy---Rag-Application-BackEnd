@@ -1,0 +1,13 @@
+{
+  "total_cases": 27,
+  "agreements": 22,
+  "disagreements": 5,
+  "agreement_percentage": 81.48,
+  "disagreement_ids": [
+    "Q1",
+    "Q2",
+    "Q3",
+    "Q6",
+    "Q28"
+  ]
+}

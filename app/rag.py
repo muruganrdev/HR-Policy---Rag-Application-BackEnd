@@ -1,6 +1,7 @@
 import re
 import os
 import time
+
 import chromadb
 import ollama
 from sentence_transformers import SentenceTransformer
@@ -180,6 +181,49 @@ def _observe_filtering_event(*, distance_threshold, candidates_before, passed, f
         _obs_logger.debug("Langfuse filtering event failed (non-fatal): %s", _e)
 
 
+def _can_recover_empty_context(question: str, document: str) -> bool:
+    """Allow a conservative lexical check for an otherwise empty context."""
+    stop_words = {
+        "a", "an", "and", "are", "can", "do", "does", "for", "from", "how",
+        "i", "is", "of", "on", "the", "to", "what", "within", "with",
+    }
+    question_terms = {
+        term for term in re.findall(r"[a-z0-9]+", question.lower())
+        if term not in stop_words and len(term) > 2
+    }
+    document_terms = set(re.findall(r"[a-z0-9]+", document.lower()))
+    return len(question_terms & document_terms) >= 2
+
+
+def _append_chunk_continuation(document: str, metadata: dict) -> str:
+    """Complete a retrieved chunk when fixed-size splitting ends mid-word."""
+    if not document or not re.search(r"[A-Za-z0-9]$", document):
+        return document
+
+    source = metadata.get("source")
+    chunk_index = metadata.get("chunk_index")
+    if source is None or chunk_index is None:
+        return document
+
+    try:
+        adjacent = collection.get(
+            where={"source": source},
+            include=["documents", "metadatas"],
+        )
+        for adjacent_document, adjacent_metadata in zip(
+            adjacent["documents"], adjacent["metadatas"]
+        ):
+            if adjacent_metadata.get("chunk_index") != chunk_index + 1:
+                continue
+            continuation = adjacent_document.lstrip()
+            if continuation and continuation[0].islower():
+                return f"{document}{continuation}"
+    except Exception:
+        pass
+
+    return document
+
+
 # --------------------------------
 # 5. RAG Function
 # --------------------------------
@@ -315,14 +359,19 @@ def ask_question(question: str):
         source = _src
         chunk_index = _chk
 
-        # Build context block with citation
+        # Complete only fixed-size chunks that end mid-word.
+        document = _append_chunk_continuation(document, metadata)
+
+        # Build a clearly bounded policy block without changing the retrieved text.
         context_parts.append(
             f"""
-Source: {source}
+    === POLICY SOURCE ===
+    File: {source}
 Chunk: {chunk_index}
 
-Content:
+    Policy Text:
 {document}
+    === END POLICY SOURCE ===
 """
         )
 
@@ -353,6 +402,30 @@ Content:
     # --------------------------------
 
     if not context:
+        # Keep the normal threshold behavior. Recover only the top reranked
+        # candidate when it has strong lexical evidence for the question.
+        if documents and _can_recover_empty_context(question, documents[0]):
+            _document = documents[0]
+            _metadata = metadatas[0]
+            context = (
+                f"\n=== POLICY SOURCE ===\n"
+                f"File: {_metadata['source']}\n"
+                f"Chunk: {_metadata['chunk_index']}\n\n"
+                f"Policy Text:\n{_document}\n"
+                f"=== END POLICY SOURCE ===\n"
+            )
+            relevant_sources.append({
+                "source": _metadata["source"],
+                "chunk": _metadata["chunk_index"],
+            })
+        else:
+            return {
+                "question": question,
+                "answer": "I don't know based on the provided HR policy documents.",
+                "sources": []
+            }
+
+    if not context:
         return {
             "question": question,
             "answer": "I don't know based on the provided HR policy documents.",
@@ -367,8 +440,11 @@ Content:
     prompt = f"""
 You are a helpful HR Policy assistant.
 
-Answer the user's question using ONLY the information
-provided in the context below.
+Answer the original user question using ONLY the supplied policy context.
+Before writing, identify every policy statement that directly governs the
+question. Keep the answer concise, but completeness takes priority over
+excessive summarization; use a short bullet list when multiple related rules
+apply.
 
 The context comes exclusively from official HR policy documents.
 
@@ -377,6 +453,31 @@ If the answer cannot be found in the context, say:
 
 Do NOT make up or invent HR policies.
 Do NOT use general knowledge to answer — only use what is in the context.
+Preserve the complete policy rule when related conditions belong to the same
+policy provision. Do not reduce a multi-part rule to only its headline number.
+For entitlement questions, preserve directly associated eligibility, scope,
+pro-rata or accrual rules, application and request procedures, approval
+requirements, deadlines, limits, expiry or lapse conditions, and consequences
+when the context states that they govern the entitlement or its use. If a
+policy states a limit and what happens when it is reached or exceeded,
+preserve both the limit and that resulting consequence. If a policy states
+that an action must be completed by a deadline, preserve that deadline when it
+governs the requested action. If a policy states an obligation and identifies
+who must receive, report, or be disclosed to, preserve both the action and its
+recipient or destination. Keep all related conditions from the same policy
+rule together. For duration questions, stay focused on the requested duration
+and directly associated conditions; do not include unrelated numeric rules.
+For consequence or escalation questions, include the complete applicable
+threshold, consequence, and escalation chain.
+Do not include unrelated retrieved policy sections. Do not combine separate
+policy limits into a new total unless the policy explicitly defines that
+calculation. Do not perform unsupported calculations. Every factual statement
+in the answer must be supported by the supplied policy context. Never combine
+contradictory policy statements or manufacture a conclusion. If the requested
+information is not present, use the existing grounded refusal sentence.
+If the provided policy context does not contain the requested information,
+clearly state that it is not covered by the provided HR policy documents and
+do not invent an answer.
 
 Context:
 {context}
@@ -406,7 +507,8 @@ Answer:
                     "role": "user",
                     "content": prompt
                 }
-            ]
+            ],
+            options={"temperature": 0.0},
         )
     _llm_latency = round((time.time() - _t_llm) * 1000, 2)
 
