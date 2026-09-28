@@ -1,0 +1,11 @@
+id,question,dependent,employee_id,agent_pass,workflow_pass,agent_latency_seconds,workflow_latency_seconds,agent_tokens,workflow_tokens,agent_estimated_cost,workflow_estimated_cost,agent_iterations,agent_termination_reason,agent_terminated_by_budget,workflow_status,agent_error,workflow_error,agent_usage_source,workflow_usage_source
+Q1,"For employee 001, how should the current annual leave balance be handled?",True,001,True,True,149.994357,47.599794,4633,1195,0.004633,0.001195,3,,False,completed,,,ollama_metadata,ollama_metadata
+Q2,"For employee 002, how many annual leave days can be carried over?",False,002,True,True,134.267165,44.024647,4649,1176,0.004649,0.001176,3,,False,completed,,,ollama_metadata,ollama_metadata
+Q3,"For employee 003, how many days can be carried over and encashed?",False,003,True,True,144.009052,44.128013,4690,1179,0.00469,0.001179,3,,False,completed,,,ollama_metadata,ollama_metadata
+Q4,"For employee 004, what portion of the annual leave balance lapses?",True,004,True,True,152.877828,43.398488,4742,1176,0.004742,0.001176,3,,False,completed,,,ollama_metadata,ollama_metadata
+Q5,"For employee 005, give the full annual leave disposition.",True,005,True,True,135.451291,48.733152,4629,1191,0.004629,0.001191,3,,False,completed,,,ollama_metadata,ollama_metadata
+Q6,"For employee 006, can the entire annual leave balance be carried over?",False,006,True,True,129.896003,43.514202,4627,1176,0.004627,0.001176,3,,False,completed,,,ollama_metadata,ollama_metadata
+Q7,"For employee 004, what is the maximum number of days that may be encashed?",False,004,True,True,82.973109,46.212706,2653,1181,0.002653,0.001181,2,,False,completed,,,ollama_metadata,ollama_metadata
+Q8,"For employee 005, how many unused annual leave days lapse?",False,005,True,True,136.315691,45.054499,4635,1164,0.004635,0.001164,3,,False,completed,,,ollama_metadata,ollama_metadata
+Q9,"For employee 001, does any annual leave balance lapse?",False,001,True,True,133.605817,42.442321,4630,1162,0.00463,0.001162,3,,False,completed,,,ollama_metadata,ollama_metadata
+Q10,"For employee 006, report the annual leave carry-over, encashment, and lapse amounts.",False,006,True,True,156.596438,48.848279,4782,1201,0.004782,0.001201,3,,False,completed,,,ollama_metadata,ollama_metadata
