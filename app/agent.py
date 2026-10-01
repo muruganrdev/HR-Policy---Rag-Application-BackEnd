@@ -36,6 +36,16 @@ from app.tools import (
     get_employees_by_manager,
     lookup_annual_leave_policy,
 )
+from app.security import (
+    SecurityValidationError,
+    ToolAuthorization,
+    authorization_for_question,
+    frame_chat_request,
+    minimize_tool_result,
+    validate_final_answer,
+    validate_tool_call,
+    validate_tool_result,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +188,7 @@ class BudgetState:
 class AgentState:
     original_question: str
     employee_record: dict[str, Any] | None = None
+    employee_not_found: dict[str, Any] | None = None
     department_result: dict[str, Any] | None = None
     manager_result: dict[str, Any] | None = None
     policy_result: dict[str, Any] | None = None
@@ -282,6 +293,10 @@ def _question_requires_calculation(q_lower: str) -> bool:
         return True
     if "carry" in q_lower and "encash" in q_lower:
         return True
+    if any(term in q_lower for term in ("carry forward", "carried forward")) and any(
+        term in q_lower for term in ("remaining", "balance", "unused")
+    ):
+        return True
     if any(term in q_lower for term in ("carry over", "carried over", "encash", "lapse", "lapsed", "unused annual leave")):
         if any(term in q_lower for term in ("how many", "what portion", "what amount", "report", "does any", "can the entire", "give the full", "how should", "how much")):
             return True
@@ -298,90 +313,91 @@ def _question_requires_calculation(q_lower: str) -> bool:
 
 def _has_required_observations(state: AgentState) -> bool:
     """Determine whether the Agent state contains sufficient observations to answer the question."""
-    q_lower = state.original_question.lower()
-
-    # Save the final-answer safety check for leave questions: a generic instruction or a
-    # non-employee-specific question must never finalize on partial state.
-    needs_calc = _question_requires_calculation(q_lower)
-    needs_policy = needs_calc or any(
-        kw in q_lower
-        for kw in (
-            "policy",
-            "limit",
-            "maximum",
-            "allowance",
-            "entitlement",
-            "rules",
-            "guidelines",
-            "compared",
-            "comparison",
-            "annual leave",
-            "carry",
-            "encash",
-            "lapse",
-            "lapsed",
-        )
-    )
-
-    if needs_calc:
-        if not _is_employee_specific_question(q_lower):
-            return False
-        if state.employee_record is None:
-            return False
-        if state.policy_result is None:
-            return False
-        return state.calculation_result is not None
-
-    if needs_policy:
-        if not _is_employee_specific_question(q_lower):
-            return False
-        if state.employee_record is None:
-            return False
-        return state.policy_result is not None
-
-    # Department employee question
-    if state.department_result is not None:
-        return True
-
-    # Manager employee question
-    if state.manager_result is not None:
-        return True
-
-    # Single employee fact question (salary, email, phone, designation, department, tenure, etc.)
-    if state.employee_record is not None:
-        return True
-
-    return False
+    return _missing_information_state(state).get("sufficient_for_final", False)
 
 
 def _missing_information_state(state: AgentState) -> dict[str, Any]:
     """Derive compact question requirements and missing observations for the LLM."""
     q_lower = state.original_question.lower()
-    needs_calculation = _question_requires_calculation(q_lower)
-    needs_policy = needs_calculation or any(
-        keyword in q_lower
-        for keyword in (
-            "policy", "limit", "maximum", "allowance", "entitlement", "rules",
-            "guidelines", "compared", "comparison",
+    is_employee = _is_employee_specific_question(q_lower)
+    is_calc = _question_requires_calculation(q_lower)
+
+    # Department query (Case E)
+    is_dept = (
+        not is_employee
+        and (
+            any(dept in q_lower for dept in ("engineering", "finance", "hr", "sales", "marketing", "operations"))
+            or "department" in q_lower
+        )
+        and any(word in q_lower for word in ("who", "which", "employees", "staff", "people", "work in"))
+    )
+
+    # Manager query (Case F)
+    is_mgr = bool(
+        re.search(r"\b(?:reports?\s+to|reporting\s+to|team\s+of)\b", q_lower)
+        or re.search(r"\b(?:who|which|employees?|staff|people)\b.*\bunder\s+[a-z]", q_lower)
+    )
+
+    # Policy comparison query (Case C: employee + policy, but not disposition calculation)
+    is_policy_comparison = (
+        is_employee
+        and not is_calc
+        and (
+            any(term in q_lower for term in ("compare", "comparison", "under the policy", "policy allows", "policy limit"))
+            or (
+                any(term in q_lower for term in ("carry", "encash"))
+                and any(term in q_lower for term in ("limit", "maximum", "policy"))
+            )
         )
     )
-    requirements = {
-        "employee_record": _is_employee_specific_question(q_lower),
-        "annual_leave_policy": needs_policy,
-        "leave_disposition_calculation": needs_calculation,
+
+    # Pure policy query (Case B)
+    is_pure_policy = (
+        not is_employee
+        and not is_dept
+        and not is_mgr
+        and (
+            any(term in q_lower for term in ("policy", "carry-over limit", "carry over limit", "carryover limit", "encashment", "limit", "rules", "guidelines", "entitlement", "allowance"))
+            or ("annual leave" in q_lower and any(term in q_lower for term in ("carry", "encash", "limit", "maximum", "how much", "how many")))
+        )
+    )
+
+    required: list[str] = []
+    if is_dept:
+        required = ["department_result"]
+    elif is_mgr:
+        required = ["manager_result"]
+    elif is_calc:
+        if is_employee:
+            required = ["employee_record", "annual_leave_policy", "leave_disposition_calculation"]
+        else:
+            required = ["annual_leave_policy", "leave_disposition_calculation"]
+    elif is_policy_comparison:
+        required = ["employee_record", "annual_leave_policy"]
+    elif is_pure_policy:
+        required = ["annual_leave_policy"]
+    elif is_employee:
+        required = ["employee_record"]
+    else:
+        required = ["annual_leave_policy"]
+
+    observations_status = {
+        "employee_record": "available" if state.employee_record is not None else "missing",
+        "department_result": "available" if state.department_result is not None else "missing",
+        "manager_result": "available" if state.manager_result is not None else "missing",
+        "policy_result": "available" if state.policy_result is not None else "missing",
+        "calculation_result": "available" if state.calculation_result is not None else "missing",
     }
-    observations = {
+
+    obs_map = {
         "employee_record": state.employee_record is not None,
-        "policy_result": state.policy_result is not None,
-        "calculation_result": state.calculation_result is not None,
+        "annual_leave_policy": state.policy_result is not None,
+        "leave_disposition_calculation": state.calculation_result is not None,
+        "department_result": state.department_result is not None,
+        "manager_result": state.manager_result is not None,
     }
-    missing: list[str] = []
-    if requirements["employee_record"] and not observations["employee_record"]:
-        missing.append("employee_record")
-    if requirements["annual_leave_policy"] and not observations["policy_result"]:
-        missing.append("annual_leave_policy")
-    if requirements["leave_disposition_calculation"] and not observations["calculation_result"]:
-        missing.append("leave_disposition_calculation")
+
+    missing = [req for req in required if not obs_map.get(req, False)]
 
     recommended_next_tool = None
     if "employee_record" in missing:
@@ -390,13 +406,27 @@ def _missing_information_state(state: AgentState) -> dict[str, Any]:
         recommended_next_tool = "lookup_annual_leave_policy"
     elif "leave_disposition_calculation" in missing:
         recommended_next_tool = "calculate_annual_leave_disposition"
+    elif "department_result" in missing:
+        recommended_next_tool = "get_department_employees"
+    elif "manager_result" in missing:
+        recommended_next_tool = "get_employees_by_manager"
 
     return {
-        "observations": observations,
-        "requirements": requirements,
+        **observations_status,
+        "observations": {
+            "employee_record": state.employee_record is not None,
+            "policy_result": state.policy_result is not None,
+            "calculation_result": state.calculation_result is not None,
+        },
+        "requirements": {
+            "employee_record": "employee_record" in required,
+            "annual_leave_policy": "annual_leave_policy" in required,
+            "leave_disposition_calculation": "leave_disposition_calculation" in required,
+        },
+        "required_information": required,
         "missing_information": missing,
         "recommended_next_tool": recommended_next_tool,
-        "sufficient_for_final": not missing,
+        "sufficient_for_final": len(missing) == 0,
     }
 
 
@@ -422,6 +452,18 @@ def _is_duplicate_tool_call(
     return False
 
 
+def _employee_not_found_answer(result: dict[str, Any]) -> str:
+    if result.get("employee_name"):
+        return (
+            f"I couldn't find an employee named '{result['employee_name']}' "
+            "in the employee records. Please check the name or provide the employee ID."
+        )
+    return (
+        f"I couldn't find an employee with ID '{result['employee_id']}' "
+        "in the employee records. Please check the ID or provide the employee name."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Decision prompt (dynamic — exposes all tools)
 # ---------------------------------------------------------------------------
@@ -441,6 +483,10 @@ def _state_for_model(state: AgentState) -> dict[str, Any]:
                 for r in policy_result.get("results", [])
             ],
         }
+    missing_info = _missing_information_state(state)
+    rec_tool = missing_info.get("recommended_next_tool")
+    if rec_tool is None and missing_info.get("sufficient_for_final"):
+        rec_tool = "final"
     return _json_safe(
         {
             "original_question": state.original_question,
@@ -452,7 +498,10 @@ def _state_for_model(state: AgentState) -> dict[str, Any]:
             "steps_completed": [
                 s.get("tool", s.get("phase")) for s in state.steps
             ],
-            "missing_information_state": _missing_information_state(state),
+            "required_information": missing_info.get("required_information", []),
+            "missing_information": missing_info.get("missing_information", []),
+            "recommended_next_tool": rec_tool,
+            "missing_information_state": missing_info,
         }
     )
 
@@ -585,14 +634,16 @@ def _policy_numeric_limit(policy_result: Any, *, keyword: str) -> float | None:
 
 def _default_tool_arguments_for_missing_requirement(state: AgentState, tool_name: str) -> dict[str, Any]:
     """Build a minimal argument set for the missing required tool."""
+    q_lower = state.original_question.lower()
     explicit_employee_id = _extract_explicit_employee_id(state.original_question)
     if tool_name == "get_employee_data":
         if explicit_employee_id is not None:
             return {"employee_id": explicit_employee_id}
         if state.employee_record and state.employee_record.get("employee_id"):
             return {"employee_id": str(state.employee_record["employee_id"])}
-        if "neha" in state.original_question.lower():
-            return {"employee_name": "Neha Iyer"}
+        for name in ("Priya Nair", "Neha Iyer", "Asha Rao", "Arjun Menon", "Vikram Shah", "Rahul Das"):
+            if name.lower() in q_lower:
+                return {"employee_name": name}
         return {"employee_name": state.original_question.strip()}
 
     if tool_name == "lookup_annual_leave_policy":
@@ -614,6 +665,18 @@ def _default_tool_arguments_for_missing_requirement(state: AgentState, tool_name
             "carry_over_limit": float(carry_over_limit),
             "encashment_limit": float(encashment_limit),
         }
+
+    if tool_name == "get_department_employees":
+        for dept in ("Engineering", "Finance", "HR", "Sales", "Marketing", "Operations"):
+            if dept.lower() in q_lower:
+                return {"department_name": dept}
+        return {"department_name": "Engineering"}
+
+    if tool_name == "get_employees_by_manager":
+        for mgr in ("Arun Kumar", "Priya Nair", "Vikram Shah"):
+            if mgr.lower() in q_lower:
+                return {"manager_name": mgr}
+        return {"manager_name": "Arun Kumar"}
 
     return {}
 
@@ -646,6 +709,11 @@ def _enforce_missing_information_decision(
     if recommended is None:
         return decision
 
+    if missing.get("sufficient_for_final") is True:
+        if decision.get("action") == "final":
+            return decision
+        return {"action": "final", "answer": ""}
+
     if decision.get("action") == "final" and missing.get("sufficient_for_final") is False:
         return {
             "action": "tool",
@@ -658,7 +726,7 @@ def _enforce_missing_information_decision(
         arguments = decision.get("arguments", {})
         last_obs = last_step.get("observation") if isinstance(last_step, dict) else None
         if isinstance(last_obs, dict) and last_obs.get("status") == "duplicate":
-            if chosen_tool != recommended:
+            if chosen_tool != recommended and recommended != "final":
                 return {
                     "action": "tool",
                     "tool": recommended,
@@ -666,12 +734,14 @@ def _enforce_missing_information_decision(
                 }
             return decision
         if _is_duplicate_tool_call(chosen_tool, arguments, state.steps):
-            return {
-                "action": "tool",
-                "tool": recommended,
-                "arguments": _default_tool_arguments_for_missing_requirement(state, recommended),
-            }
-        if chosen_tool != recommended:
+            if recommended != "final":
+                return {
+                    "action": "tool",
+                    "tool": recommended,
+                    "arguments": _default_tool_arguments_for_missing_requirement(state, recommended),
+                }
+            return {"action": "final", "answer": ""}
+        if chosen_tool != recommended and recommended != "final":
             return {
                 "action": "tool",
                 "tool": recommended,
@@ -749,19 +819,73 @@ def decide_next_action(
 # execute_tool — dispatcher for all registered tools
 # ---------------------------------------------------------------------------
 
-def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-    """Validate and execute exactly one registered tool."""
+def _authorization_for_state(state: AgentState) -> ToolAuthorization:
+    return authorization_for_question(
+        state.original_question,
+        frozenset(TOOLS),
+        employee_record=state.employee_record,
+        policy_result=state.policy_result,
+    )
+
+
+def _validated_state_result(
+    state: AgentState,
+    tool_name: str,
+    result: dict[str, Any],
+    authorization: ToolAuthorization,
+) -> dict[str, Any]:
+    validated = validate_tool_result(
+        tool_name,
+        result,
+        expected_calculation_inputs=authorization.expected_calculation_inputs,
+    )
+    employee_record = validated if tool_name == "get_employee_data" else state.employee_record
+    policy_result = validated if tool_name == "lookup_annual_leave_policy" else state.policy_result
+    result_authorization = authorization_for_question(
+        state.original_question,
+        frozenset(TOOLS),
+        employee_record=employee_record,
+        policy_result=policy_result,
+    )
+    return minimize_tool_result(tool_name, validated, result_authorization)
+
+
+def execute_tool(
+    tool_name: str,
+    arguments: dict[str, Any],
+    *,
+    authorization: ToolAuthorization | None = None,
+) -> dict[str, Any]:
+    """Validate allowlist and arguments before dispatching one registered tool."""
+    if authorization is None:
+        authorization = ToolAuthorization(
+            registered_tools=frozenset(TOOLS),
+            allowed_tools=frozenset(TOOLS),
+        )
+    try:
+        arguments = validate_tool_call(tool_name, arguments, authorization)
+    except (ValueError, PermissionError) as error:
+        raise SecurityValidationError(str(error)) from error
+
     spec = TOOLS.get(tool_name)
     if spec is None:
-        raise ValueError(f"Unknown tool: {tool_name}")
+        raise SecurityValidationError(f"Unknown tool: {tool_name}")
 
     if tool_name == "get_employee_data":
         emp_id = arguments.get("employee_id")
         emp_name = arguments.get("employee_name")
-        return spec.callable(
-            employee_id=emp_id if emp_id else None,
-            employee_name=emp_name if emp_name else None,
-        )
+        try:
+            return spec.callable(
+                employee_id=emp_id if emp_id else None,
+                employee_name=emp_name if emp_name else None,
+            )
+        except EmployeeNotFoundError:
+            return {
+                "found": False,
+                "employee_name": emp_name if emp_name else None,
+                "employee_id": emp_id if emp_id else None,
+                "message": "No employee record found.",
+            }
 
     if tool_name == "get_department_employees":
         dept = arguments.get("department_name")
@@ -961,8 +1085,9 @@ def run_agent(
         reason = state.budget.check()
         if reason:
             raise BudgetExceeded(reason)
-        response = selected_chat(**request)
-        _record_response_usage(state.budget, request, response)
+        framed_request = frame_chat_request(request)
+        response = selected_chat(**framed_request)
+        _record_response_usage(state.budget, framed_request, response)
         reason = state.budget.check()
         if reason:
             raise BudgetExceeded(reason)
@@ -1078,22 +1203,42 @@ def run_agent(
                 _emit(state, f"[FINAL]\n{state.final_answer}")
                 break
 
-            state.steps.append(
-                {
-                    "phase": "observation",
+            missing_info = _missing_information_state(state)
+            recommended_tool = missing_info.get("recommended_next_tool")
+            if (
+                recommended_tool is not None
+                and recommended_tool != "final"
+                and recommended_tool != tool_name
+            ):
+                _emit(
+                    state,
+                    f"Runtime override: duplicate tool {tool_name} blocked; redirecting to missing tool {recommended_tool}.",
+                )
+                tool_name = recommended_tool
+                arguments = _default_tool_arguments_for_missing_requirement(
+                    state, recommended_tool
+                )
+                decision = {
+                    "action": "tool",
                     "tool": tool_name,
-                    "arguments": _json_safe(arguments),
-                    "observation": {
-                        "status": "duplicate",
-                        "message": "Tool already succeeded with these arguments; required observations are still incomplete. Select a missing required tool.",
-                    },
+                    "arguments": arguments,
                 }
-            )
-            _emit(
-                state,
-                "Observation: duplicate prevented; required observations incomplete; select a missing required tool.",
-            )
-            continue
+            else:
+                try:
+                    state.final_answer = _generate_final_answer(
+                        state, selected_chat, model_call=model_call
+                    )
+                except BudgetExceeded as error:
+                    state.budget.termination_reason = error.reason
+                    _emit(state, _budget_line(state.budget, error.reason))
+                    break
+                except Exception as error:
+                    state.final_answer = (
+                        f"Agent stopped safely: final answer generation failed ({error})."
+                    )
+                state.steps.append({"phase": "final", "answer": state.final_answer})
+                _emit(state, f"[FINAL]\n{state.final_answer}")
+                break
 
         reason = state.budget.check()
         if reason:
@@ -1107,12 +1252,30 @@ def run_agent(
             f"Action: {tool_name}\nArguments: {json.dumps(_json_safe(arguments), sort_keys=True)}",
         )
 
+        authorization = _authorization_for_state(state)
+        security_failure = False
         try:
-            result = execute_tool(tool_name, arguments)
-            observation = {"status": "success", "result": result}
+            result = execute_tool(
+                tool_name,
+                arguments,
+                authorization=authorization,
+            )
+            result = _validated_state_result(
+                state, tool_name, result, authorization
+            )
+            is_employee_not_found = (
+                tool_name == "get_employee_data" and result.get("found") is False
+            )
+            observation = {
+                "status": "not_found" if is_employee_not_found else "success",
+                "result": result,
+            }
             # Store results in named state slots
             if tool_name == "get_employee_data":
-                state.employee_record = result
+                if is_employee_not_found:
+                    state.employee_not_found = result
+                else:
+                    state.employee_record = result
             elif tool_name == "get_department_employees":
                 state.department_result = result
             elif tool_name == "get_employees_by_manager":
@@ -1121,6 +1284,9 @@ def run_agent(
                 state.policy_result = result
             elif tool_name == "calculate_annual_leave_disposition":
                 state.calculation_result = result
+        except SecurityValidationError as error:
+            observation = {"status": "error", "error": str(error)}
+            security_failure = True
         except Exception as error:
             observation = {"status": "error", "error": str(error)}
 
@@ -1137,6 +1303,18 @@ def run_agent(
             state,
             f"Observation: {json.dumps(_json_safe(observation), sort_keys=True)}",
         )
+
+        if security_failure:
+            state.final_answer = "Agent stopped safely: tool security validation failed."
+            state.steps.append({"phase": "final", "answer": state.final_answer})
+            _emit(state, f"[FINAL]\n{state.final_answer}")
+            break
+
+        if observation.get("status") == "not_found":
+            state.final_answer = _employee_not_found_answer(observation["result"])
+            state.steps.append({"phase": "final", "answer": state.final_answer})
+            _emit(state, f"[FINAL]\n{state.final_answer}")
+            break
 
         # Check if required observations are now available to generate final answer directly
         if observation.get("status") == "success" and _has_required_observations(state):
@@ -1173,6 +1351,26 @@ def run_agent(
                 f"Agent stopped: {state.budget.termination_reason}."
             )
         _emit(state, f"\n[FINAL]\n{state.final_answer}")
+
+    final_authorization = _authorization_for_state(state)
+    executed_tools = [
+        step["tool"]
+        for step in state.steps
+        if step.get("phase") == "tool" and step.get("tool")
+    ]
+    final_check = validate_final_answer(
+        state.original_question,
+        state.final_answer,
+        authorization=final_authorization,
+        executed_tools=executed_tools,
+        authoritative_calculation=state.calculation_result,
+    )
+    if not final_check["safe"]:
+        _emit(
+            state,
+            f"[SECURITY] Final answer rejected: {final_check['reasons']}",
+        )
+    state.final_answer = final_check["answer"]
 
     tools_used = []
     seen_tools = set()

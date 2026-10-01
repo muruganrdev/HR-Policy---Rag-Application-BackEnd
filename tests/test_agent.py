@@ -5,7 +5,13 @@ import json
 import pytest
 
 import app.agent as agent
-from app.tools import Jurisdiction
+from app.router import route_question
+from app.security import _database_value_exists
+from app.tools import (
+    EmployeeNotFoundError,
+    Jurisdiction,
+    get_employee_data as database_get_employee_data,
+)
 
 
 class ChatSequence:
@@ -43,7 +49,14 @@ def _install_policy_stub(monkeypatch):
         lambda jurisdiction: {
             "jurisdiction": jurisdiction,
             "policy_area": "annual_leave_balance",
-            "results": [{"source": "leave_policy.pdf", "content": "10 carry over; 5 encash."}],
+            "results": [{
+                "source": "leave_policy.pdf",
+                "chunk_index": 2,
+                "content": (
+                    "Unused annual leave of up to 10 days may be carried over. "
+                    "A maximum of 5 days may be encashed per calendar year."
+                ),
+            }],
         },
     )
 
@@ -134,18 +147,101 @@ def test_agent_reaches_final_answer_after_full_disposition(monkeypatch):
 # Error handling
 # ---------------------------------------------------------------------------
 
-def test_unknown_employee_error_is_observed_without_crash():
+def test_unknown_employee_id_is_a_terminal_not_found_observation():
     chat = ChatSequence([
         {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "999"}},
-        {"action": "final", "answer": "The employee record could not be found."},
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "999"}},
     ])
 
     result = agent.run_agent("Find employee 999.", chat_fn=chat)
 
     observation = result["steps"][0]["observation"]
-    assert observation["status"] == "error"
-    assert "No employee found" in observation["error"]
-    assert result["answer"] == "The employee record could not be found."
+    assert observation["status"] == "not_found"
+    assert observation["result"]["found"] is False
+    assert "999" in result["answer"]
+    assert "couldn't find" in result["answer"]
+    assert len([step for step in result["steps"] if step.get("phase") == "tool"]) == 1
+    assert result["iteration_count"] == 1
+    assert result["termination_reason"] is None
+
+
+def test_unknown_employee_name_is_a_terminal_not_found_without_rag_fallback():
+    chat = ChatSequence([
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Ravi Kumar"}},
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Ravi Kumar"}},
+    ])
+
+    assert route_question("What is Ravi Kumar's annual salary?") == "agent"
+    result = agent.run_agent("What is Ravi Kumar's annual salary?", chat_fn=chat)
+
+    assert result["steps"][0]["observation"]["status"] == "not_found"
+    assert "Ravi Kumar" in result["answer"]
+    assert "couldn't find" in result["answer"]
+    assert "salary is" not in result["answer"]
+    assert len([step for step in result["steps"] if step.get("phase") == "tool"]) == 1
+    assert result["termination_reason"] is None
+
+
+def test_arjun_not_found_response_when_lookup_reports_missing(monkeypatch):
+    original_exists = _database_value_exists
+    monkeypatch.setattr(
+        agent.TOOLS["get_employee_data"],
+        "callable",
+        lambda **kwargs: (_ for _ in ()).throw(
+            EmployeeNotFoundError("No employee found with name: Arjun Menon")
+        ),
+    )
+    monkeypatch.setattr(
+        "app.security._database_value_exists",
+        lambda column, value: (
+            False if column == "employee_name" and value.casefold() == "arjun menon"
+            else original_exists(column, value)
+        ),
+    )
+    chat = ChatSequence([
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Arjun Menon"}},
+    ])
+
+    result = agent.run_agent("What department does Arjun Menon work in?", chat_fn=chat)
+
+    assert result["steps"][0]["observation"]["status"] == "not_found"
+    assert "Arjun Menon" in result["answer"]
+    assert "department is" not in result["answer"]
+    assert result["termination_reason"] is None
+
+
+def test_existing_arjun_department_is_returned_from_database():
+    result = agent.run_agent(
+        "What department does Arjun Menon work in?",
+        chat_fn=ChatSequence([
+            {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Arjun Menon"}},
+        ]),
+    )
+
+    assert result["answer"] == "Arjun Menon's department is Engineering."
+    assert result["termination_reason"] is None
+
+
+def test_existing_priya_department_is_returned_from_database():
+    result = agent.run_agent(
+        "What department does Priya Nair work in?",
+        chat_fn=ChatSequence([
+            {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Priya Nair"}},
+        ]),
+    )
+
+    assert result["answer"] == "Priya Nair's department is Product."
+
+
+def test_employee_id_department_regression():
+    result = agent.run_agent(
+        "What department does employee 003 work in?",
+        chat_fn=ChatSequence([
+            {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "003"}},
+        ]),
+    )
+
+    assert result["answer"] == "Neha Iyer's department is Engineering."
 
 
 def test_invalid_tool_request_is_rejected():
@@ -157,14 +253,18 @@ def test_invalid_tool_request_is_rejected():
 # Budget tests
 # ---------------------------------------------------------------------------
 
-def test_iteration_limit_stops_repeated_non_final_decisions():
+def test_iteration_limit_stops_before_required_calculation(monkeypatch):
+    _install_policy_stub(monkeypatch)
     chat = ChatSequence([
-        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "001"}},
-        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "002"}},
-        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "003"}},
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "005"}},
+        {"action": "tool", "tool": "lookup_annual_leave_policy", "arguments": {"jurisdiction": "INDIA"}},
     ])
 
-    result = agent.run_agent("Keep computing annual leave disposition for employees.", chat_fn=chat, max_iterations=2)
+    result = agent.run_agent(
+        "For employee 005, give the full annual leave disposition.",
+        chat_fn=chat,
+        max_iterations=2,
+    )
 
     assert result["iteration_count"] == 2
     assert result["termination_reason"] == "max_iterations"
@@ -261,7 +361,7 @@ def test_finalizes_full_leave_disposition_without_post_observation_llm_call(monk
     def get_employee_data(employee_id=None, employee_name=None):
         calls["employee"] += 1
         assert employee_id == "002"
-        return {"employee_id": "002", "employee_name": "Vikram Shah", "leave_balance": 4.0, "tenure_years": 8.0}
+        return database_get_employee_data(employee_id=employee_id)
 
     def lookup_policy(jurisdiction):
         calls["policy"] += 1
@@ -270,6 +370,7 @@ def test_finalizes_full_leave_disposition_without_post_observation_llm_call(monk
             "policy_area": "annual_leave_balance",
             "results": [{
                 "source": "leave_policy.pdf",
+                "chunk_index": 2,
                 "content": (
                     "Unused annual leave of up to 10 days may be carried over. "
                     "A maximum of 5 days may be encashed per calendar year."
@@ -312,13 +413,16 @@ def test_policy_limit_finalizes_without_calculation_or_post_observation_llm_call
 
     def get_employee_data(employee_id=None, employee_name=None):
         calls["employee"] += 1
-        return {"employee_id": employee_id, "employee_name": "Arjun Menon", "leave_balance": 12.0}
+        return database_get_employee_data(employee_id=employee_id)
 
     def lookup_policy(jurisdiction):
         calls["policy"] += 1
         return {
             "jurisdiction": jurisdiction,
+            "policy_area": "annual_leave_balance",
             "results": [{
+                "source": "leave_policy.pdf",
+                "chunk_index": 2,
                 "content": "A maximum of 5 days may be encashed per calendar year."
             }],
         }
@@ -351,12 +455,7 @@ def test_employee_only_question_finalizes_from_record_without_policy_tools(monke
 
     def get_employee_data(employee_id=None, employee_name=None):
         calls["employee"] += 1
-        return {
-            "employee_id": "003",
-            "employee_name": "Neha Iyer",
-            "annual_salary": 840000.0,
-            "tenure_years": 1.5,
-        }
+        return database_get_employee_data(employee_name=employee_name)
 
     def unexpected_policy(**kwargs):
         calls["policy"] += 1
@@ -430,6 +529,37 @@ def test_employee_plus_policy_question_does_not_call_calc(monkeypatch):
     tool_names = [s["tool"] for s in result["steps"] if s.get("phase") == "tool"]
     assert tool_names == ["get_employee_data", "lookup_annual_leave_policy"]
     assert "calculate_annual_leave_disposition" not in tool_names
+
+
+def test_carry_forward_remaining_leave_uses_existing_disposition_flow(monkeypatch):
+    _install_policy_stub(monkeypatch)
+    chat = ChatSequence([
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Priya Nair"}},
+        {"action": "tool", "tool": "lookup_annual_leave_policy", "arguments": {"jurisdiction": "INDIA"}},
+        {
+            "action": "tool",
+            "tool": "calculate_annual_leave_disposition",
+            "arguments": {
+                "leave_balance": 20.0,
+                "carry_over_limit": 10.0,
+                "encashment_limit": 5.0,
+            },
+        },
+    ])
+
+    result = agent.run_agent(
+        "Can Priya Nair carry forward her remaining annual leave?",
+        chat_fn=chat,
+    )
+
+    assert [
+        step["tool"] for step in result["steps"] if step.get("phase") == "tool"
+    ] == [
+        "get_employee_data",
+        "lookup_annual_leave_policy",
+        "calculate_annual_leave_disposition",
+    ]
+    assert "10 days can be carried over" in result["answer"]
 
 
 def test_duplicate_tool_call_protection_prevents_infinite_loop():

@@ -5,3 +5,13 @@ uvicorn app.main:app --reload --port 8001
 ollama list
 
 one line command week 6 : .\venv\Scripts\python.exe evaluation\run_week6_eval.py
+
+Week 8 focused tests:
+.\venv\Scripts\python.exe -m pytest tests/test_agent_completion.py -q
+.\venv\Scripts\python.exe -m pytest tests/test_failure_analysis.py -q
+.\venv\Scripts\python.exe -m pytest tests/test_prompt_injection.py -q
+.\venv\Scripts\python.exe -m pytest tests/test_security_controls.py -q
+.\venv\Scripts\python.exe -m pytest tests/test_trajectory_evaluator.py -q
+
+Week 8 final trajectory evaluation:
+.\venv\Scripts\python.exe -m evaluation.trajectory_evaluator

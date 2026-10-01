@@ -64,6 +64,23 @@ EMPLOYEE_ID_CONTEXT = re.compile(
     re.IGNORECASE,
 )
 
+_FULL_PERSON_NAME = r"([A-Za-z][A-Za-z'-]*\s+[A-Za-z][A-Za-z'-]*)"
+_EMPLOYEE_LOOKUP_NAME_PATTERNS = (
+    re.compile(
+        rf"\b{_FULL_PERSON_NAME}'s\s+(?:annual\s+)?(?:salary|pay|department|email|phone|"
+        r"annual leave balance|leave balance|work mode|designation|manager)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\bwhat\s+department\s+does\s+{_FULL_PERSON_NAME}\s+work\s+in\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\b(?:find|look\s+up|lookup)\s+employee\s+(?:named\s+)?{_FULL_PERSON_NAME}\b",
+        re.IGNORECASE,
+    ),
+)
+
 # Department/manager/team query indicators
 TEAM_QUERY_PATTERNS = re.compile(
     r"\b(?:who\s+(?:works?\s+in|is\s+in|are\s+in|reports?\s+to)|"
@@ -79,21 +96,26 @@ TEAM_QUERY_PATTERNS = re.compile(
 def _contains_employee_name(question: str) -> bool:
     """Check whether the question contains a known employee name."""
     q_lower = question.lower()
-    return any(name in q_lower for name in _EMPLOYEE_NAMES)
+    return any(name in q_lower for name in _EMPLOYEE_NAMES) or (
+        _extract_employee_lookup_name(question) is not None
+    )
+
+
+def _extract_employee_lookup_name(question: str) -> str | None:
+    """Extract a full name only from employee-fact lookup question forms."""
+    for pattern in _EMPLOYEE_LOOKUP_NAME_PATTERNS:
+        match = pattern.search(question)
+        if match:
+            return match.group(1).strip()
+    return None
 
 
 def _contains_employee_id(question: str) -> bool:
-    """Check whether the question contains a known employee ID pattern."""
-    # Direct lookup in known IDs
-    for match in EMPLOYEE_ID_CONTEXT.finditer(question):
-        if match.group(1) in _EMPLOYEE_IDS:
-            return True
-    # Possessive pattern: "005's"
-    for match in EMPLOYEE_ID_PATTERN.finditer(question):
-        eid = match.group(1) or match.group(2)
-        if eid and eid in _EMPLOYEE_IDS:
-            return True
-    return False
+    """Check for an explicitly requested three-digit employee identifier."""
+    return bool(
+        EMPLOYEE_ID_CONTEXT.search(question)
+        or EMPLOYEE_ID_PATTERN.search(question)
+    )
 
 
 def _is_team_query(question: str) -> bool:
