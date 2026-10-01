@@ -994,13 +994,30 @@ def _generate_final_answer(
             (("leave balance", "annual leave balance"), "leave_balance", "annual leave balance"),
             (("sick leave balance",), "sick_leave_balance", "sick leave balance"),
         )
-        for phrases, key, label in fields:
-            if any(phrase in question for phrase in phrases) and employee.get(key) is not None:
-                value = employee[key]
+        requested_fields = [
+            (key, label)
+            for phrases, key, label in fields
+            if any(phrase in question for phrase in phrases)
+        ]
+        available_fields = [
+            (key, label, employee[key])
+            for key, label in requested_fields
+            if employee.get(key) is not None
+        ]
+        if requested_fields and len(available_fields) == len(requested_fields):
+            formatted_fields = []
+            for key, label, value in available_fields:
                 if key == "annual_salary":
                     value = f"{float(value):,.0f}"
-                    return f"{name}'s {label} is {value}."
+                formatted_fields.append((label, value))
+            if len(formatted_fields) == 1:
+                label, value = formatted_fields[0]
                 return f"{name}'s {label} is {value}."
+            details = " and ".join(
+                f"{label} is {value}"
+                for label, value in formatted_fields
+            )
+            return f"{name}'s {details}."
 
     request = {
         "model": OLLAMA_MODEL,

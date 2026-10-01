@@ -478,6 +478,27 @@ def test_employee_only_question_finalizes_from_record_without_policy_tools(monke
     assert result["termination_reason"] is None
 
 
+def test_employee_question_with_multiple_fields_answers_all_requested_fields():
+    chat = ChatSequence([
+        {
+            "action": "tool",
+            "tool": "get_employee_data",
+            "arguments": {"employee_name": "Priya Nair"},
+        },
+    ])
+
+    result = agent.run_agent(
+        "What is Priya Nair's leave balance and annual salary?",
+        chat_fn=chat,
+    )
+
+    assert "Priya Nair's annual salary is 1,800,000" in result["answer"]
+    assert "leave balance is 20.0" in result["answer"]
+    assert result["tools_used"] == ["get_employee_data"]
+    assert chat.calls == 1
+    assert result["termination_reason"] is None
+
+
 def test_deterministic_final_answer_uses_only_calculation_observation():
     state = agent.AgentState(
         original_question="For employee 002, give the full annual leave disposition.",
