@@ -283,9 +283,16 @@ The API will be available at:
 **Request:**
 ```json
 {
-  "question": "How many annual leave days are employees entitled to?"
+      "question": "How many annual leave days are employees entitled to?",
+      "conversation_id": "browser-generated-conversation-id"
 }
 ```
+
+`conversation_id` is optional. When supplied, `/ask` keeps up to 6 recent
+question/answer turns for that conversation in bounded, process-local memory.
+Use the same ID for messages in one chat and a new ID for each new chat. This
+short-term context is not persisted and is separate from the long-term memory
+experiments. Requests without an ID retain their single-question behavior.
 
 **Response:**
 ```json
