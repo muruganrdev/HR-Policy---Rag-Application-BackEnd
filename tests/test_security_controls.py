@@ -453,7 +453,7 @@ def test_employee_field_minimization_keeps_only_requested_value():
     assert projected == {"employee_name": "Neha Iyer", "annual_salary": 840000.0}
 
 
-def test_policy_question_gets_no_employee_capability():
+def test_policy_question_gets_no_employee_tool():
     allowed = minimum_tools_for_question(
         "What is the annual leave carry-over limit?"
     )
@@ -467,13 +467,13 @@ def test_policy_question_gets_no_employee_capability():
         )
 
 
-def test_salary_question_does_not_get_policy_capability():
+def test_salary_question_does_not_get_policy_tool():
     assert minimum_tools_for_question("What is Neha Iyer's annual salary?") == frozenset(
         {"get_employee_data"}
     )
 
 
-def test_capability_sets_match_question_types():
+def test_question_tool_sets_match_question_types():
     assert minimum_tools_for_question("Which employees work in Engineering?") == frozenset(
         {"get_department_employees"}
     )
@@ -500,6 +500,84 @@ def test_capability_sets_match_question_types():
     )
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Who works in the Engineering department?",
+        "Who works in Engineering?",
+        "Which employees work in Engineering?",
+        "Who is in the Engineering department?",
+        "Show the employees in Engineering.",
+        "List employees in the Engineering department.",
+    ],
+)
+def test_department_roster_phrasing_authorizes_local_and_discovered_tools(question):
+    registered = REGISTERED_TOOLS | frozenset(
+        {"hris_get_department_roster", "unrelated_secret_tool"}
+    )
+    authorization = authorization_for_question(question, registered)
+
+    assert authorization.allowed_department_names == frozenset({"Engineering"})
+    assert "get_department_employees" in authorization.allowed_tools
+    assert "hris_get_department_roster" in authorization.allowed_tools
+    assert "unrelated_secret_tool" not in authorization.allowed_tools
+    assert validate_tool_call(
+        "get_department_employees",
+        {"department_name": "Engineering"},
+        authorization,
+    ) == {"department_name": "Engineering"}
+    assert validate_tool_call(
+        "hris_get_department_roster",
+        {"department_name": "Engineering"},
+        authorization,
+    ) == {"department_name": "Engineering"}
+
+
+def test_mcp_equivalents_follow_local_question_authorization():
+    registered = REGISTERED_TOOLS | frozenset({
+        "hris_get_employee_leave_balance",
+        "hris_get_employee_grade_band",
+    })
+    leave_auth = authorization_for_question(
+        "What is Priya Nair's leave balance?", registered
+    )
+    grade_auth = authorization_for_question(
+        "What is Priya Nair's grade band?", registered
+    )
+
+    assert "get_employee_data" in leave_auth.allowed_tools
+    assert "hris_get_employee_leave_balance" in leave_auth.allowed_tools
+    assert grade_auth.allowed_tools == frozenset({"hris_get_employee_grade_band"})
+    with pytest.raises(PermissionError, match="not authorized"):
+        validate_tool_call(
+            "get_employee_data",
+            {"employee_name": "Priya Nair"},
+            grade_auth,
+        )
+    assert validate_tool_call(
+        "hris_get_employee_grade_band",
+        {"employee_name": "Priya Nair"},
+        grade_auth,
+    ) == {"employee_name": "Priya Nair"}
+
+
+def test_final_answer_rejects_grade_band_value_after_scope_denial():
+    registered = REGISTERED_TOOLS | frozenset({"hris_get_employee_grade_band"})
+    question = "What is Priya Nair's grade band?"
+    authorization = authorization_for_question(question, registered)
+
+    checked = validate_final_answer(
+        question,
+        "Priya Nair's grade band is G7.",
+        authorization=authorization,
+        executed_tools=["hris_get_employee_grade_band"],
+    )
+
+    assert checked["safe"] is False
+    assert "employee_fields_outside_task_scope" in checked["reasons"]
+    assert "G7" not in checked["answer"]
+
+
 def test_final_answer_rejects_calculation_contradiction():
     authorization = _authorization("For employee 005, give the full annual leave disposition.")
     authoritative = {
@@ -522,3 +600,25 @@ def test_final_answer_rejects_calculation_contradiction():
 
     assert checked["safe"] is False
     assert "calculation_answer_mismatch" in checked["reasons"]
+
+
+def test_final_answer_allows_product_manager_as_requested_designation():
+    question = "What is Priya Nair's designation?"
+    checked = validate_final_answer(
+        question,
+        "Priya Nair's designation is Product Manager.",
+        authorization=_authorization(question),
+        executed_tools=["get_employee_data"],
+    )
+
+    assert checked["safe"] is True
+    assert checked["answer"] == "Priya Nair's designation is Product Manager."
+
+    manager_disclosure = validate_final_answer(
+        question,
+        "Priya Nair's designation is Product Manager. Her manager is Deepak Sharma.",
+        authorization=_authorization(question),
+        executed_tools=["get_employee_data"],
+    )
+    assert manager_disclosure["safe"] is False
+    assert "manager_name" in manager_disclosure["out_of_scope_fields"]

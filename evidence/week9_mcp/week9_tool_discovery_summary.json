@@ -1,0 +1,9 @@
+{
+  "before_mcp_tools": 5,
+  "after_mcp_tools": 7,
+  "discovery_delta": 2,
+  "servers": [
+    "hr_policy_server",
+    "hris_server"
+  ]
+}

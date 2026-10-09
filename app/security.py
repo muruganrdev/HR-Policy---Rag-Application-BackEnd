@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from html import escape
 from typing import Any
 
+from jsonschema import ValidationError as JSONSchemaValidationError
+from jsonschema import validate as validate_json_schema
+
 from app.tools import DATABASE_PATH, Jurisdiction
 
 
@@ -35,11 +38,15 @@ _EMPLOYEE_FIELD_PATTERNS = {
     "employee_name": re.compile(r"\bemployee[_ ]name\s*[:=]", re.IGNORECASE),
     "email": re.compile(r"\bemail\b", re.IGNORECASE),
     "phone": re.compile(r"\bphone(?:_number)?\b", re.IGNORECASE),
-    "manager_name": re.compile(r"\bmanager(?:_name)?\b", re.IGNORECASE),
+    "manager_name": re.compile(
+        r"\bmanager_name\b|\bmanager\b\s*(?:(?:is|was|named|called)\b|[:=])",
+        re.IGNORECASE,
+    ),
     "location": re.compile(r"\blocation\b", re.IGNORECASE),
     "date_of_joining": re.compile(r"\bdate[_ ]of[_ ]joining\b", re.IGNORECASE),
     "sick_leave_balance": re.compile(r"\bsick[_ ]leave[_ ]balance\b", re.IGNORECASE),
     "leave_balance": re.compile(r"\b(?:annual[_ ]leave[_ ]balance|leave_balance)\b", re.IGNORECASE),
+    "grade_band": re.compile(r"\bgrade[ _-]band\b", re.IGNORECASE),
 }
 _EMPLOYEE_ID_VALUE_PATTERN = re.compile(
     r"\b(?:employee[_\s]*(?:id)?|id)\s*[:#]?\s*(\d{3})\b",
@@ -56,7 +63,14 @@ _UNTRUSTED_REQUEST_MARKER = re.compile(
     re.IGNORECASE,
 )
 _DEPARTMENT_QUERY = re.compile(
-    r"\b(?:employees?|staff|people)\b.*?\b(?:in|from|within)\s+([A-Za-z][A-Za-z &'-]*?)\s*(?:department)?[?.!]*$",
+    r"\b(?:"
+    r"(?:who\s+)?(?:works?\s+in|is\s+in)\s+"
+    r"|which\s+employees?\s+(?:work|are)\s+in\s+"
+    r"|(?:who|which)\b.*?\b(?:employees?|staff|people)\b.*?\b(?:in|from|within)\s+"
+    r"|(?:list|show|get)\s+(?:(?:all|the)\s+)?employees?\s+(?:in|from|of)\s+"
+    r"|(?:employees?|staff|people)\s+(?:are\s+)?(?:in|from|within)\s+"
+    r")"
+    r"(?:the\s+)?([A-Za-z][A-Za-z &'-]*?)\s*(?:department)?[?.!]*$",
     re.IGNORECASE,
 )
 _MANAGER_QUERY = re.compile(
@@ -78,20 +92,26 @@ _CALCULATION_RESULT_PATTERNS = {
     ),
 }
 
-CAPABILITY_TABLE = {
-    "employee_fact": ("get_employee_data",),
-    "department_roster": ("get_department_employees",),
-    "manager_roster": ("get_employees_by_manager",),
-    "policy_fact": ("lookup_annual_leave_policy",),
-    "employee_policy_comparison": (
-        "get_employee_data",
-        "lookup_annual_leave_policy",
-    ),
-    "leave_disposition": (
-        "get_employee_data",
-        "lookup_annual_leave_policy",
-        "calculate_annual_leave_disposition",
-    ),
+EMPLOYEE_FACT_TOOLS = ("get_employee_data",)
+DEPARTMENT_ROSTER_TOOLS = ("get_department_employees",)
+MANAGER_ROSTER_TOOLS = ("get_employees_by_manager",)
+POLICY_FACT_TOOLS = ("lookup_annual_leave_policy",)
+EMPLOYEE_POLICY_COMPARISON_TOOLS = (
+    "get_employee_data",
+    "lookup_annual_leave_policy",
+)
+LEAVE_DISPOSITION_TOOLS = (
+    "get_employee_data",
+    "lookup_annual_leave_policy",
+    "calculate_annual_leave_disposition",
+)
+GRADE_BAND_TOOLS = ("hris_get_employee_grade_band",)
+MCP_TOOL_ALTERNATIVES = {
+    "hris_get_employee_snapshot": "get_employee_data",
+    "hris_get_employee_leave_balance": "get_employee_data",
+    "hris_get_department_roster": "get_department_employees",
+    "hris_get_manager_team": "get_employees_by_manager",
+    "mcp_lookup_annual_leave_policy": "lookup_annual_leave_policy",
 }
 
 
@@ -162,17 +182,18 @@ def _database_employee_ids(employee_names: frozenset[str]) -> frozenset[str]:
     return frozenset(row[0] for row in rows)
 
 
-def minimum_tools_for_question(question: str) -> frozenset[str]:
-    """Resolve the narrowest HR capability set required by a question."""
+def minimum_tools_for_question(
+    question: str, registered_tools: frozenset[str] | None = None
+) -> frozenset[str]:
+    """Resolve the narrowest HR tool set required by a question."""
     question = _task_scope_question(question)
     text = question.casefold()
+    base_tools: set[str] = set()
     if re.search(r"\b(?:who|which|list|show|get)\b.*\b(?:reports? to|under|team of)\b", text):
-        return frozenset(CAPABILITY_TABLE["manager_roster"])
-    if re.search(
-        r"\b(?:who|which|list|show|get)\b.*\b(?:employees?|staff|people)\b.*\b(?:in|from|within)\b",
-        text,
-    ):
-        return frozenset(CAPABILITY_TABLE["department_roster"])
+        base_tools.update(MANAGER_ROSTER_TOOLS)
+    department_query = _DEPARTMENT_QUERY.search(question)
+    if department_query:
+        base_tools.update(DEPARTMENT_ROSTER_TOOLS)
 
     try:
         from app.router import _contains_employee_id, _contains_employee_name
@@ -180,6 +201,9 @@ def minimum_tools_for_question(question: str) -> frozenset[str]:
         employee_specific = _contains_employee_id(question) or _contains_employee_name(question)
     except Exception:
         employee_specific = bool(_EMPLOYEE_ID_QUESTION_PATTERN.search(question))
+
+    requested_employee_fields = _requested_employee_fields(question)
+    is_grade_band = "grade_band" in requested_employee_fields
 
     is_disposition = any(
         term in text for term in ("disposition", "how should", "handled", "lapse", "lapsed")
@@ -194,15 +218,27 @@ def minimum_tools_for_question(question: str) -> frozenset[str]:
         for term in ("policy", "carry", "carried", "encash", "annual leave limit", "leave limit")
     )
 
-    if employee_specific and is_disposition:
-        return frozenset(CAPABILITY_TABLE["leave_disposition"])
-    if employee_specific and has_policy_requirement:
-        return frozenset(CAPABILITY_TABLE["employee_policy_comparison"])
-    if employee_specific:
-        return frozenset(CAPABILITY_TABLE["employee_fact"])
-    if has_policy_requirement:
-        return frozenset(CAPABILITY_TABLE["policy_fact"])
-    return frozenset()
+    if employee_specific and is_grade_band:
+        base_tools.update(GRADE_BAND_TOOLS)
+    elif employee_specific and is_disposition:
+        base_tools.update(LEAVE_DISPOSITION_TOOLS)
+    elif employee_specific and has_policy_requirement:
+        base_tools.update(EMPLOYEE_POLICY_COMPARISON_TOOLS)
+    elif employee_specific:
+        base_tools.update(EMPLOYEE_FACT_TOOLS)
+    elif has_policy_requirement:
+        base_tools.update(POLICY_FACT_TOOLS)
+
+    if registered_tools is not None:
+        matching_mcp_tools = {
+            tool_name
+            for tool_name in registered_tools
+            if tool_name in MCP_TOOL_ALTERNATIVES
+            and MCP_TOOL_ALTERNATIVES[tool_name] in base_tools
+        }
+        base_tools.update(matching_mcp_tools)
+
+    return frozenset(base_tools)
 
 
 def _requested_employee_fields(question: str) -> frozenset[str]:
@@ -222,6 +258,7 @@ def _requested_employee_fields(question: str) -> frozenset[str]:
         "tenure_years": ("tenure",),
         "leave_balance": ("leave balance",),
         "sick_leave_balance": ("sick leave balance",),
+        "grade_band": ("grade band", "grade-band", "grade_band"),
     }
     return frozenset(
         field
@@ -239,7 +276,7 @@ def authorization_for_question(
 ) -> ToolAuthorization:
     """Build task-scoped tool and entity permissions from the user question."""
     question = _task_scope_question(question)
-    allowed_tools = minimum_tools_for_question(question)
+    allowed_tools = minimum_tools_for_question(question, registered_tools)
     employee_ids = frozenset(
         match.group(1) or match.group(2)
         for match in _EMPLOYEE_ID_QUESTION_PATTERN.finditer(question)
@@ -274,6 +311,7 @@ def authorization_for_question(
             }
 
     allowed_employee_fields = set(_requested_employee_fields(question))
+    allowed_employee_fields.discard("grade_band")
     if "calculate_annual_leave_disposition" in allowed_tools:
         allowed_employee_fields.update({"employee_id", "leave_balance", "jurisdiction"})
 
@@ -416,6 +454,8 @@ def validate_tool_call(
     tool_name: str,
     arguments: Any,
     authorization: ToolAuthorization,
+    *,
+    input_schema: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate registry membership, task capability, and tool argument shape."""
     if tool_name not in authorization.registered_tools:
@@ -437,7 +477,38 @@ def validate_tool_call(
         },
     }
     if tool_name not in schemas:
-        raise ValueError(f"No security schema is defined for tool: {tool_name}")
+        equivalents = {
+            "hris_get_employee_snapshot": "get_employee_data",
+            "hris_get_employee_leave_balance": "get_employee_data",
+            "hris_get_department_roster": "get_department_employees",
+            "hris_get_manager_team": "get_employees_by_manager",
+            "mcp_lookup_annual_leave_policy": "lookup_annual_leave_policy",
+        }
+        canonical_tool = equivalents.get(tool_name)
+        if canonical_tool is not None:
+            return validate_tool_call(canonical_tool, arguments, authorization)
+        if input_schema is not None:
+            try:
+                validate_json_schema(instance=arguments, schema=input_schema)
+            except JSONSchemaValidationError as error:
+                raise ValueError(
+                    f"Arguments do not match the discovered schema for {tool_name}: {error.message}"
+                ) from error
+            if tool_name == "hris_get_employee_grade_band":
+                employee_name = arguments.get("employee_name")
+                if (
+                    authorization.allowed_employee_names is not None
+                    and employee_name.casefold()
+                    not in {name.casefold() for name in authorization.allowed_employee_names}
+                ):
+                    raise PermissionError(f"Employee name is not authorized: {employee_name}")
+                if not _database_value_exists("employee_name", employee_name):
+                    raise SecurityValidationError("employee_name is not present in the HR database")
+            return dict(arguments)
+        normalized = dict(arguments)
+        if not normalized:
+            raise ValueError(f"Tool arguments for '{tool_name}' are missing")
+        return normalized
     if set(arguments) - schemas[tool_name]:
         raise ValueError(f"Unexpected arguments for tool: {tool_name}")
 
@@ -660,7 +731,9 @@ def validate_tool_result(
                     "Calculation result contradicts its validated inputs"
                 )
     else:
-        raise SecurityValidationError(f"No result schema is defined for {tool_name}")
+        if not isinstance(result, dict):
+            raise SecurityValidationError(f"MCP tool '{tool_name}' did not return an object")
+        return result
     return result
 
 

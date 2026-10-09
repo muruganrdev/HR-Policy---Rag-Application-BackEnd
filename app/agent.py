@@ -26,6 +26,7 @@ from typing import Any, Callable
 
 import ollama
 
+from app.mcp_client import MCPClient
 from app.tools import (
     AmbiguousEmployeeError,
     EmployeeNotFoundError,
@@ -37,15 +38,18 @@ from app.tools import (
     lookup_annual_leave_policy,
 )
 from app.security import (
+    JSONSchemaValidationError,
     SecurityValidationError,
     ToolAuthorization,
     authorization_for_question,
     frame_chat_request,
     minimize_tool_result,
     validate_final_answer,
+    validate_json_schema,
     validate_tool_call,
     validate_tool_result,
 )
+from app.short_term_memory import MAX_SHORT_TERM_TURNS
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +74,7 @@ class ToolSpec:
     name: str
     description: str
     callable: Callable[..., dict[str, Any]]
+    input_schema: dict[str, Any] | None = None
 
 
 TOOLS: dict[str, ToolSpec] = {
@@ -131,6 +136,77 @@ TOOLS: dict[str, ToolSpec] = {
     ),
 }
 
+_MCP_CLIENT = MCPClient()
+MCP_TOOLS: dict[str, ToolSpec] = {}
+
+try:
+    for tool_name, specs in _MCP_CLIENT.build_agent_tool_registry().items():
+        if tool_name in TOOLS and tool_name != "lookup_annual_leave_policy":
+            continue
+        registry_name = f"mcp_{tool_name}" if tool_name in TOOLS else tool_name
+
+        def _mcp_callable(
+            arguments=None,
+            *,
+            tool_name=tool_name,
+            server_name=specs.get("mcp_server"),
+            **kwargs,
+        ):
+            payload = dict(arguments or {})
+            payload.update(kwargs)
+            return _MCP_CLIENT.call_tool(tool_name, payload, server_name=server_name)
+
+        MCP_TOOLS[registry_name] = ToolSpec(
+            name=registry_name,
+            description=(
+                "MCP gateway tool; scoped and audited. "
+                + specs.get("description", "Discovered MCP tool.")
+            ),
+            callable=_mcp_callable,
+            input_schema=specs.get("parameters"),
+        )
+except Exception:
+    pass
+
+
+def all_registered_tools() -> frozenset[str]:
+    return frozenset(TOOLS) | frozenset(MCP_TOOLS)
+
+
+def _preferred_mcp_tool(local_tool: str | None, question: str) -> str | None:
+    if local_tool is None:
+        return None
+    text = question.casefold()
+    if local_tool == "get_employee_data":
+        if re.search(r"\bemployee\s+(?:id\s+)?\d{3}\b", text):
+            return None
+        if re.search(r"\bgrade[ _-]band\b", text):
+            candidates = ("hris_get_employee_grade_band",)
+        elif "leave balance" in text:
+            candidates = ("hris_get_employee_leave_balance", "hris_get_employee_snapshot")
+        else:
+            candidates = ("hris_get_employee_snapshot",)
+    elif local_tool == "get_department_employees":
+        candidates = ("hris_get_department_roster",)
+    elif local_tool == "get_employees_by_manager":
+        candidates = ("hris_get_manager_team",)
+    elif local_tool == "lookup_annual_leave_policy":
+        candidates = ("mcp_lookup_annual_leave_policy",)
+    else:
+        return None
+    return next((name for name in candidates if name in MCP_TOOLS), None)
+
+
+def _local_tool_equivalent(mcp_tool: str) -> str | None:
+    equivalents = {
+        "hris_get_employee_snapshot": "get_employee_data",
+        "hris_get_employee_leave_balance": "get_employee_data",
+        "hris_get_department_roster": "get_department_employees",
+        "hris_get_manager_team": "get_employees_by_manager",
+        "mcp_lookup_annual_leave_policy": "lookup_annual_leave_policy",
+    }
+    return equivalents.get(mcp_tool)
+
 
 # ---------------------------------------------------------------------------
 # Budget
@@ -187,6 +263,9 @@ class BudgetState:
 @dataclass
 class AgentState:
     original_question: str
+    resolved_question: str | None = None
+    conversation_history: list[dict[str, str]] = field(default_factory=list)
+    prefer_mcp_tools: bool = False
     employee_record: dict[str, Any] | None = None
     employee_not_found: dict[str, Any] | None = None
     department_result: dict[str, Any] | None = None
@@ -198,6 +277,10 @@ class AgentState:
     final_answer: str | None = None
     trace_lines: list[str] = field(default_factory=list)
     budget: BudgetState | None = None
+
+    @property
+    def active_question(self) -> str:
+        return self.resolved_question or self.original_question
 
 
 # ---------------------------------------------------------------------------
@@ -278,8 +361,8 @@ def _is_employee_specific_question(q_lower: str) -> bool:
 
 
 def _extract_explicit_employee_id(question: str) -> str | None:
-    """Return the exact three-digit employee ID explicitly present in a question."""
-    match = re.search(r"\b(?:employee\s+(?:id\s+)?)?(00[1-6])\b", question.lower())
+    """Return the exact three-digit employee ID, including unknown IDs."""
+    match = re.search(r"\b(?:employee\s+(?:id\s+)?)?(\d{3})\b", question.lower())
     return match.group(1) if match else None
 
 
@@ -318,7 +401,7 @@ def _has_required_observations(state: AgentState) -> bool:
 
 def _missing_information_state(state: AgentState) -> dict[str, Any]:
     """Derive compact question requirements and missing observations for the LLM."""
-    q_lower = state.original_question.lower()
+    q_lower = state.active_question.lower()
     is_employee = _is_employee_specific_question(q_lower)
     is_calc = _question_requires_calculation(q_lower)
 
@@ -410,7 +493,6 @@ def _missing_information_state(state: AgentState) -> dict[str, Any]:
         recommended_next_tool = "get_department_employees"
     elif "manager_result" in missing:
         recommended_next_tool = "get_employees_by_manager"
-
     return {
         **observations_status,
         "observations": {
@@ -434,6 +516,18 @@ def _recommended_next_tool(question: str, state: AgentState) -> str | None:
     """Return the single missing tool the runtime should prefer for this question."""
     _ = question
     return _missing_information_state(state).get("recommended_next_tool")
+
+
+def _fallback_tool_for_failed_mcp(tool_name: str) -> str | None:
+    """Return a local equivalent when the preferred MCP capability has failed."""
+    mapping = {
+        "mcp_lookup_annual_leave_policy": "lookup_annual_leave_policy",
+        "hris_get_employee_leave_balance": "get_employee_data",
+        "hris_get_employee_snapshot": "get_employee_data",
+        "hris_get_department_roster": "get_department_employees",
+        "hris_get_manager_team": "get_employees_by_manager",
+    }
+    return mapping.get(tool_name)
 
 
 def _is_duplicate_tool_call(
@@ -507,32 +601,55 @@ def _state_for_model(state: AgentState) -> dict[str, Any]:
 
 
 def _decision_prompt(state: AgentState) -> str:
+    available_tools = {**TOOLS, **MCP_TOOLS}
     tool_descriptions = [
-        {"name": spec.name, "description": spec.description}
-        for spec in TOOLS.values()
+        {
+            "name": name,
+            "source": "MCP gateway (scoped and audited)" if name in MCP_TOOLS else "local fallback",
+            "description": spec.description,
+            "inputSchema": spec.input_schema,
+        }
+        for name, spec in available_tools.items()
     ]
+    state_for_model = _state_for_model(state)
+    preferred = (
+        _preferred_mcp_tool(
+            state_for_model.get("recommended_next_tool"), state.active_question
+        )
+        if state.prefer_mcp_tools
+        else None
+    )
+    if preferred:
+        state_for_model["recommended_next_tool"] = preferred
+        state_for_model["missing_information_state"]["recommended_next_tool"] = preferred
     return json.dumps(
         {
             "role": (
                 "You are a deterministic HR agent. Choose exactly ONE next action "
                 "based ONLY on what is needed to answer the question. "
                 "Select the MINIMUM number of tools required. "
-                "If the question only asks for employee info (email, department, designation, etc.), "
-                "call get_employee_data and then choose 'final' — do NOT call policy or calculation tools. "
-                "Only call lookup_annual_leave_policy and calculate_annual_leave_disposition "
-                "when the question requires computing a leave disposition."
+                "Prefer an available MCP gateway tool whenever it covers the required capability; "
+                "gateway calls are scoped and audited. Use local tools only when no MCP equivalent "
+                "is available, and never retry a denied gateway capability through a local fallback. "
+                "For employee snapshots use hris_get_employee_snapshot; for leave balance use "
+                "hris_get_employee_leave_balance; for rosters use hris_get_department_roster; "
+                "for manager teams use hris_get_manager_team; for policy use "
+                "mcp_lookup_annual_leave_policy. A grade-band request must use "
+                "hris_get_employee_grade_band and respect its gateway authorization result. "
+                "Use calculation tools only when required inputs have been observed."
             ),
-            "question": state.original_question,
+            "question": state.active_question,
+            "original_question": state.original_question,
             "available_tools": tool_descriptions,
-            "state": _state_for_model(state),
+                "state": state_for_model,
             "rules": [
-                "Call get_employee_data when the answer requires any individual employee fact.",
+                "Use a discovered MCP gateway capability in preference to an equivalent local fallback.",
                 "If the question contains an explicit employee ID, use that exact ID and never substitute an employee name or another ID.",
                 "Employee data alone is insufficient for policy limits, policy comparisons, leave lapse questions, or leave disposition questions when policy evidence is missing.",
                 "Before selecting an action, inspect missing_information_state and select its recommended_next_tool when information is missing.",
-                "Call get_department_employees when the question asks which employees are in a department.",
-                "Call get_employees_by_manager when the question asks who reports to a manager.",
-                "Call lookup_annual_leave_policy ONLY when policy limits (carry-over/encashment) are needed.",
+                "Use hris_get_department_roster for department roster questions and hris_get_manager_team for manager questions when discovered.",
+                "Use mcp_lookup_annual_leave_policy for annual leave policy questions when discovered.",
+                "Use hris_get_employee_grade_band when a grade-band question requires that specific fact.",
                 "Call calculate_annual_leave_disposition ONLY when you have both leave_balance AND policy limits.",
                 "If a successful tool was already called with the same arguments, do not repeat it; select a different missing tool when more observations are required.",
                 "Choose 'final' as soon as the question can be answered from observed data.",
@@ -634,19 +751,26 @@ def _policy_numeric_limit(policy_result: Any, *, keyword: str) -> float | None:
 
 def _default_tool_arguments_for_missing_requirement(state: AgentState, tool_name: str) -> dict[str, Any]:
     """Build a minimal argument set for the missing required tool."""
-    q_lower = state.original_question.lower()
-    explicit_employee_id = _extract_explicit_employee_id(state.original_question)
-    if tool_name == "get_employee_data":
+    q_lower = state.active_question.lower()
+    explicit_employee_id = _extract_explicit_employee_id(state.active_question)
+    if tool_name in {
+        "get_employee_data",
+        "hris_get_employee_snapshot",
+        "hris_get_employee_leave_balance",
+        "hris_get_employee_grade_band",
+    }:
         if explicit_employee_id is not None:
-            return {"employee_id": explicit_employee_id}
+            if tool_name == "get_employee_data":
+                return {"employee_id": explicit_employee_id}
         if state.employee_record and state.employee_record.get("employee_id"):
-            return {"employee_id": str(state.employee_record["employee_id"])}
+            if tool_name == "get_employee_data":
+                return {"employee_id": str(state.employee_record["employee_id"])}
         for name in ("Priya Nair", "Neha Iyer", "Asha Rao", "Arjun Menon", "Vikram Shah", "Rahul Das"):
             if name.lower() in q_lower:
                 return {"employee_name": name}
-        return {"employee_name": state.original_question.strip()}
+        return {"employee_name": state.active_question.strip()}
 
-    if tool_name == "lookup_annual_leave_policy":
+    if tool_name in {"lookup_annual_leave_policy", "mcp_lookup_annual_leave_policy"}:
         return {"jurisdiction": "INDIA"}
 
     if tool_name == "calculate_annual_leave_disposition":
@@ -666,14 +790,14 @@ def _default_tool_arguments_for_missing_requirement(state: AgentState, tool_name
             "encashment_limit": float(encashment_limit),
         }
 
-    if tool_name == "get_department_employees":
+    if tool_name in {"get_department_employees", "hris_get_department_roster"}:
         for dept in ("Engineering", "Finance", "HR", "Sales", "Marketing", "Operations"):
             if dept.lower() in q_lower:
                 return {"department_name": dept}
         return {"department_name": "Engineering"}
 
-    if tool_name == "get_employees_by_manager":
-        for mgr in ("Arun Kumar", "Priya Nair", "Vikram Shah"):
+    if tool_name in {"get_employees_by_manager", "hris_get_manager_team"}:
+        for mgr in ("Arun Kumar", "Deepak Sharma", "Priya Nair", "Vikram Shah"):
             if mgr.lower() in q_lower:
                 return {"manager_name": mgr}
         return {"manager_name": "Arun Kumar"}
@@ -761,6 +885,54 @@ def decide_next_action(
     model_call: Callable[[dict[str, Any]], Any] | None = None,
 ) -> dict[str, Any]:
     """Ask llama3 to select the next action from the current state."""
+    if state.steps:
+        last_step = state.steps[-1]
+        last_observation = last_step.get("observation", {})
+        missing = _missing_information_state(state)
+        recommended = missing.get("recommended_next_tool")
+        if last_observation.get("status") == "error":
+            if recommended and not missing.get("sufficient_for_final"):
+                failed_tool = last_step.get("tool")
+                if failed_tool in MCP_TOOLS:
+                    fallback = _fallback_tool_for_failed_mcp(failed_tool)
+                    if fallback is not None:
+                        recommended = fallback
+                elif failed_tool == recommended:
+                    fallback = _fallback_tool_for_failed_mcp(failed_tool)
+                    if fallback is not None:
+                        recommended = fallback
+                if failed_tool in MCP_TOOLS:
+                    return {
+                        "action": "tool",
+                        "tool": recommended,
+                        "arguments": _default_tool_arguments_for_missing_requirement(
+                            state, recommended
+                        ),
+                    }
+                if state.prefer_mcp_tools:
+                    preferred = _preferred_mcp_tool(recommended, state.active_question)
+                    if preferred is not None:
+                        recommended = preferred
+                return {
+                    "action": "tool",
+                    "tool": recommended,
+                    "arguments": _default_tool_arguments_for_missing_requirement(
+                        state, recommended
+                    ),
+                }
+        elif recommended and not missing.get("sufficient_for_final"):
+            if state.prefer_mcp_tools:
+                recommended = _preferred_mcp_tool(
+                    recommended, state.active_question
+                ) or recommended
+            return {
+                "action": "tool",
+                "tool": recommended,
+                "arguments": _default_tool_arguments_for_missing_requirement(
+                    state, recommended
+                ),
+            }
+
     chat = chat_fn or ollama.chat
     request: dict[str, Any] = {
         "model": OLLAMA_MODEL,
@@ -821,8 +993,8 @@ def decide_next_action(
 
 def _authorization_for_state(state: AgentState) -> ToolAuthorization:
     return authorization_for_question(
-        state.original_question,
-        frozenset(TOOLS),
+        state.active_question,
+        all_registered_tools(),
         employee_record=state.employee_record,
         policy_result=state.policy_result,
     )
@@ -842,7 +1014,7 @@ def _validated_state_result(
     employee_record = validated if tool_name == "get_employee_data" else state.employee_record
     policy_result = validated if tool_name == "lookup_annual_leave_policy" else state.policy_result
     result_authorization = authorization_for_question(
-        state.original_question,
+        state.active_question,
         frozenset(TOOLS),
         employee_record=employee_record,
         policy_result=policy_result,
@@ -858,18 +1030,53 @@ def execute_tool(
 ) -> dict[str, Any]:
     """Validate allowlist and arguments before dispatching one registered tool."""
     if authorization is None:
+        registered = all_registered_tools()
         authorization = ToolAuthorization(
-            registered_tools=frozenset(TOOLS),
-            allowed_tools=frozenset(TOOLS),
+            registered_tools=registered,
+            allowed_tools=registered,
         )
-    try:
-        arguments = validate_tool_call(tool_name, arguments, authorization)
-    except (ValueError, PermissionError) as error:
-        raise SecurityValidationError(str(error)) from error
-
-    spec = TOOLS.get(tool_name)
+    spec = TOOLS.get(tool_name) or MCP_TOOLS.get(tool_name)
     if spec is None:
         raise SecurityValidationError(f"Unknown tool: {tool_name}")
+    if tool_name in MCP_TOOLS:
+        if tool_name not in authorization.allowed_tools:
+            raise SecurityValidationError(f"Tool is not authorized for this task: {tool_name}")
+        if not isinstance(arguments, dict):
+            raise SecurityValidationError(f"Tool arguments for '{tool_name}' are missing")
+        arguments = dict(arguments)
+        if spec.input_schema is not None:
+            try:
+                validate_json_schema(instance=arguments, schema=spec.input_schema)
+            except JSONSchemaValidationError as error:
+                raise SecurityValidationError(
+                    f"Arguments do not match the discovered schema for {tool_name}: {error.message}"
+                ) from error
+    else:
+        try:
+            arguments = validate_tool_call(
+                tool_name,
+                arguments,
+                authorization,
+                input_schema=spec.input_schema if tool_name in MCP_TOOLS else None,
+            )
+        except SecurityValidationError as error:
+            raise SecurityValidationError(str(error)) from error
+        except (ValueError, PermissionError) as error:
+            raise SecurityValidationError(str(error)) from error
+
+    try:
+        if tool_name not in {"get_employee_data", "get_department_employees", "get_employees_by_manager", "lookup_annual_leave_policy", "calculate_annual_leave_disposition"}:
+            return spec.callable(**arguments)
+    except Exception as error:
+        return {
+            "error": str(error),
+            "recoverable": True,
+            "tool": tool_name,
+            "arguments": dict(arguments),
+        }
+
+    if tool_name not in {"get_employee_data", "get_department_employees", "get_employees_by_manager", "lookup_annual_leave_policy", "calculate_annual_leave_disposition"}:
+        return spec.callable(**arguments)
 
     if tool_name == "get_employee_data":
         emp_id = arguments.get("employee_id")
@@ -952,10 +1159,59 @@ def _generate_final_answer(
             f"{_fmt(calc.get('lapsed_days'))} days lapse."
         )
 
+    if state.department_result is not None:
+        department = state.department_result["department"]
+        employee_names = [
+            item["employee_name"] for item in state.department_result["employees"]
+        ]
+        if not employee_names:
+            return f"No employees were found in {department}."
+        if len(employee_names) == 1:
+            return f"{employee_names[0]} works in {department}."
+        if len(employee_names) == 2:
+            return f"{employee_names[0]} and {employee_names[1]} work in {department}."
+        return f"{', '.join(employee_names[:-1])}, and {employee_names[-1]} work in {department}."
+
+    if state.manager_result is not None:
+        manager = state.manager_result["manager_name"]
+        employee_names = [
+            item["employee_name"] for item in state.manager_result["employees"]
+        ]
+        if not employee_names:
+            return f"No employees report to {manager}."
+        if len(employee_names) == 1:
+            return f"{employee_names[0]} reports to {manager}."
+        if len(employee_names) == 2:
+            return f"{employee_names[0]} and {employee_names[1]} report to {manager}."
+        return f"{', '.join(employee_names[:-1])}, and {employee_names[-1]} report to {manager}."
+
     if state.policy_result is not None:
-        question = state.original_question.lower()
+        question = state.active_question.lower()
         employee = state.employee_record or {}
-        if "encash" in state.original_question.lower():
+        if "annual leave" in question and "policy" in question:
+            passages = [
+                item
+                for item in state.policy_result.get("results", [])
+                if isinstance(item, dict)
+                and isinstance(item.get("content"), str)
+                and re.search(r"annual leave|carry.?over|encash", item["content"], re.IGNORECASE)
+            ][:3]
+            if passages:
+                carry_limit = _policy_numeric_limit(
+                    state.policy_result, keyword="carry_over"
+                )
+                encash_limit = _policy_numeric_limit(
+                    state.policy_result, keyword="encashment"
+                )
+                citation = f"{passages[0].get('source', 'policy document')}, chunk {passages[0].get('chunk_index', 'unknown')}"
+                if carry_limit is not None and encash_limit is not None:
+                    return (
+                        f"India's annual leave policy allows up to {_fmt(carry_limit)} days "
+                        f"to be carried over and up to {_fmt(encash_limit)} days to be encashed "
+                        f"per calendar year. Unused balance above the carry-over limit lapses. "
+                        f"(Source: {citation})"
+                    )
+        if "encash" in state.active_question.lower():
             limit = _policy_numeric_limit(state.policy_result, keyword="encashment")
             if limit is not None:
                 if employee.get("employee_name") and employee.get("leave_balance") is not None and "compar" in question:
@@ -964,7 +1220,7 @@ def _generate_final_answer(
                         f"employees may encash a maximum of {_fmt(limit)} days per calendar year."
                     )
                 return f"Employees may encash a maximum of {_fmt(limit)} days per calendar year."
-        if "carry" in state.original_question.lower():
+        if "carry" in state.active_question.lower():
             limit = _policy_numeric_limit(state.policy_result, keyword="carry_over")
             if limit is not None:
                 if employee.get("employee_name") and employee.get("leave_balance") is not None and "compar" in question:
@@ -977,7 +1233,7 @@ def _generate_final_answer(
     if state.employee_record is not None:
         employee = state.employee_record
         name = str(employee.get("employee_name") or "The employee")
-        question = state.original_question.lower()
+        question = state.active_question.lower()
         fields = (
             (("annual salary", "salary"), "annual_salary", "annual salary"),
             (("email",), "email", "email address"),
@@ -1036,7 +1292,7 @@ def _generate_final_answer(
                 "role": "user",
                 "content": json.dumps(
                     {
-                        "question": state.original_question,
+                        "question": state.active_question,
                         "employee_record": _json_safe(state.employee_record),
                         "department_result": _json_safe(state.department_result),
                         "manager_result": _json_safe(state.manager_result),
@@ -1077,6 +1333,9 @@ def _generate_final_answer(
 def run_agent(
     question: str,
     *,
+    original_question: str | None = None,
+    conversation_history: list[dict[str, Any]] | None = None,
+    prefer_mcp_tools: bool = False,
     chat_fn: Callable[..., Any] | None = None,
     max_iterations: int = MAX_ITERATIONS,
     max_tokens: int = MAX_TOKENS,
@@ -1086,7 +1345,19 @@ def run_agent(
     monotonic_fn: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
     """Run the THINK → DO → OBSERVE loop until final or safety stop."""
-    state = AgentState(original_question=question)
+    history = [
+        {"role": message["role"], "content": message["content"]}
+        for message in (conversation_history or [])
+        if isinstance(message, dict)
+        and message.get("role") in {"user", "assistant"}
+        and isinstance(message.get("content"), str)
+    ][-MAX_SHORT_TERM_TURNS * 2 :]
+    state = AgentState(
+        original_question=original_question or question,
+        resolved_question=question,
+        conversation_history=history,
+        prefer_mcp_tools=prefer_mcp_tools,
+    )
     state.budget = BudgetState(
         max_iterations=max_iterations,
         max_tokens=max_tokens,
@@ -1152,6 +1423,8 @@ def run_agent(
 
             if not _has_required_observations(state):
                 recommended = _recommended_next_tool(question, state)
+                if state.prefer_mcp_tools:
+                    recommended = _preferred_mcp_tool(recommended, state.active_question) or recommended
                 if recommended is not None:
                     decision = {
                         "action": "tool",
@@ -1182,6 +1455,26 @@ def run_agent(
             explicit_employee_id = _extract_explicit_employee_id(question)
             if explicit_employee_id is not None:
                 arguments = {"employee_id": explicit_employee_id}
+
+        if state.prefer_mcp_tools:
+            last_error = None
+            if state.steps and isinstance(state.steps[-1], dict):
+                last_error = state.steps[-1].get("observation", {}).get("status")
+            if not (
+                state.steps
+                and state.steps[-1].get("tool") in MCP_TOOLS
+                and last_error == "error"
+            ):
+                preferred_mcp_tool = _preferred_mcp_tool(tool_name, state.active_question)
+                if preferred_mcp_tool is not None:
+                    _emit(
+                        state,
+                        f"Runtime preference: using discovered MCP gateway capability {preferred_mcp_tool} instead of local fallback {tool_name}.",
+                    )
+                    tool_name = preferred_mcp_tool
+                    arguments = _default_tool_arguments_for_missing_requirement(
+                        state, tool_name
+                    )
 
         recommended_tool = _recommended_next_tool(question, state)
         if (
@@ -1277,27 +1570,59 @@ def run_agent(
                 arguments,
                 authorization=authorization,
             )
+            if isinstance(result, dict) and result.get("recoverable") is True and "error" in result:
+                observation = {
+                    "status": "error",
+                    "error": result["error"],
+                    "recoverable": True,
+                    "result": result,
+                }
+                state.steps.append(
+                    {
+                        "phase": "tool",
+                        "tool": tool_name,
+                        "arguments": _json_safe(arguments),
+                        "observation": _json_safe(observation),
+                    }
+                )
+                _emit(state, f"[STEP {state.iteration_count}] OBSERVE")
+                _emit(
+                    state,
+                    f"Observation: {json.dumps(_json_safe(observation), sort_keys=True)}",
+                )
+                _emit(state, "Runtime recovery: following the missing-information recommendation.")
+                local_fallback = _local_tool_equivalent(tool_name)
+                if local_fallback is not None:
+                    decision = {
+                        "action": "tool",
+                        "tool": local_fallback,
+                        "arguments": _default_tool_arguments_for_missing_requirement(
+                            state, local_fallback
+                        ),
+                    }
+                continue
             result = _validated_state_result(
                 state, tool_name, result, authorization
             )
             is_employee_not_found = (
-                tool_name == "get_employee_data" and result.get("found") is False
+                tool_name in {"get_employee_data", "hris_get_employee_snapshot"}
+                and result.get("found") is False
             )
             observation = {
                 "status": "not_found" if is_employee_not_found else "success",
                 "result": result,
             }
             # Store results in named state slots
-            if tool_name == "get_employee_data":
+            if tool_name in {"get_employee_data", "hris_get_employee_snapshot", "hris_get_employee_leave_balance"}:
                 if is_employee_not_found:
                     state.employee_not_found = result
                 else:
                     state.employee_record = result
-            elif tool_name == "get_department_employees":
+            elif tool_name in {"get_department_employees", "hris_get_department_roster"}:
                 state.department_result = result
-            elif tool_name == "get_employees_by_manager":
+            elif tool_name in {"get_employees_by_manager", "hris_get_manager_team"}:
                 state.manager_result = result
-            elif tool_name == "lookup_annual_leave_policy":
+            elif tool_name in {"lookup_annual_leave_policy", "mcp_lookup_annual_leave_policy"}:
                 state.policy_result = result
             elif tool_name == "calculate_annual_leave_disposition":
                 state.calculation_result = result
@@ -1322,7 +1647,10 @@ def run_agent(
         )
 
         if security_failure:
-            state.final_answer = "Agent stopped safely: tool security validation failed."
+            state.final_answer = (
+                "Agent stopped safely: tool security validation failed. "
+                "The answer could not be validated against the authorized HR data."
+            )
             state.steps.append({"phase": "final", "answer": state.final_answer})
             _emit(state, f"[FINAL]\n{state.final_answer}")
             break
@@ -1373,10 +1701,15 @@ def run_agent(
     executed_tools = [
         step["tool"]
         for step in state.steps
-        if step.get("phase") == "tool" and step.get("tool")
+        if (
+            step.get("phase") == "tool"
+            and step.get("tool")
+            and isinstance(step.get("observation"), dict)
+            and step["observation"].get("status") == "success"
+        )
     ]
     final_check = validate_final_answer(
-        state.original_question,
+        state.active_question,
         state.final_answer,
         authorization=final_authorization,
         executed_tools=executed_tools,
@@ -1399,7 +1732,7 @@ def run_agent(
                 tools_used.append(t)
 
     return {
-        "question": question,
+        "question": state.original_question,
         "answer": state.final_answer,
         "steps": _json_safe(state.steps),
         "tools_used": tools_used,

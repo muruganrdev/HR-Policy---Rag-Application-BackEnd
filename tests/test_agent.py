@@ -104,6 +104,57 @@ def test_department_lookup_uses_correct_tool(monkeypatch):
     assert result["steps"][0]["observation"]["status"] == "success"
 
 
+def test_manager_result_finalizes_from_observed_employee_names():
+    chat = ChatSequence([
+        {
+            "action": "tool",
+            "tool": "get_employees_by_manager",
+            "arguments": {"manager_name": "Deepak Sharma"},
+        },
+    ])
+
+    result = agent.run_agent("Who reports to Deepak Sharma?", chat_fn=chat)
+
+    assert result["steps"][0]["observation"]["result"]["employees"][0]["employee_name"] == "Priya Nair"
+    assert result["answer"] == "Priya Nair reports to Deepak Sharma."
+    assert chat.calls == 1
+
+
+def test_annual_leave_policy_question_routes_to_agent():
+    question = "What is the annual leave policy for India?"
+
+    assert route_question(question) == "agent"
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Who works in the Engineering department?",
+        "Who works in Engineering?",
+        "Which employees work in Engineering?",
+        "Who is in the Engineering department?",
+    ],
+)
+def test_engineering_roster_variants_are_authorized_and_answered(question):
+    chat = ChatSequence([
+        {
+            "action": "tool",
+            "tool": "get_department_employees",
+            "arguments": {"department_name": "Engineering"},
+        },
+    ])
+
+    assert route_question(question) == "agent"
+    result = agent.run_agent(question, chat_fn=chat)
+
+    assert result["steps"][0]["tool"] == "get_department_employees"
+    assert result["steps"][0]["observation"]["status"] == "success"
+    assert result["answer"] == "Neha Iyer and Arjun Menon work in Engineering."
+    assert "Neha Iyer" in result["answer"]
+    assert "Arjun Menon" in result["answer"]
+    assert "unauthorized_tool_execution" not in result["trace"]
+
+
 def test_simple_employee_question_does_not_call_policy_or_calc():
     """For a pure employee-info question, only get_employee_data should be called."""
     chat = ChatSequence([
@@ -165,6 +216,22 @@ def test_unknown_employee_id_is_a_terminal_not_found_observation():
     assert result["termination_reason"] is None
 
 
+def test_mcp_preference_keeps_unknown_explicit_id_on_local_lookup():
+    chat = ChatSequence([
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "999"}},
+    ])
+
+    result = agent.run_agent(
+        "What is the salary of employee 999?",
+        chat_fn=chat,
+        prefer_mcp_tools=True,
+    )
+
+    assert result["tools_used"] == ["get_employee_data"]
+    assert result["steps"][0]["observation"]["status"] == "not_found"
+    assert "couldn't find an employee with ID '999'" in result["answer"]
+
+
 def test_unknown_employee_name_is_a_terminal_not_found_without_rag_fallback():
     chat = ChatSequence([
         {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Ravi Kumar"}},
@@ -182,30 +249,32 @@ def test_unknown_employee_name_is_a_terminal_not_found_without_rag_fallback():
     assert result["termination_reason"] is None
 
 
-def test_arjun_not_found_response_when_lookup_reports_missing(monkeypatch):
+def test_ghost_employee_not_found_response_when_lookup_reports_missing(monkeypatch):
     original_exists = _database_value_exists
     monkeypatch.setattr(
         agent.TOOLS["get_employee_data"],
         "callable",
         lambda **kwargs: (_ for _ in ()).throw(
-            EmployeeNotFoundError("No employee found with name: Arjun Menon")
+            EmployeeNotFoundError("No employee found with name: Ghost Employee")
         ),
     )
     monkeypatch.setattr(
         "app.security._database_value_exists",
         lambda column, value: (
-            False if column == "employee_name" and value.casefold() == "arjun menon"
+            False if column == "employee_name" and value.casefold() == "ghost employee"
             else original_exists(column, value)
         ),
     )
     chat = ChatSequence([
-        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Arjun Menon"}},
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_name": "Ghost Employee"}},
     ])
 
-    result = agent.run_agent("What department does Arjun Menon work in?", chat_fn=chat)
+    result = agent.run_agent(
+        "What department does Ghost Employee work in?", chat_fn=chat
+    )
 
     assert result["steps"][0]["observation"]["status"] == "not_found"
-    assert "Arjun Menon" in result["answer"]
+    assert "Ghost Employee" in result["answer"]
     assert "department is" not in result["answer"]
     assert result["termination_reason"] is None
 
@@ -395,7 +464,7 @@ def test_finalizes_full_leave_disposition_without_post_observation_llm_call(monk
         "calculate_annual_leave_disposition",
     ]
     assert calls == {"employee": 1, "policy": 1, "calculation": 1}
-    assert chat.calls == 3
+    assert chat.calls == 1
     assert "4 days can be carried over" in result["answer"]
     assert "4 days can be encashed" in result["answer"]
     assert "0 days lapse" in result["answer"]
@@ -441,7 +510,7 @@ def test_policy_limit_finalizes_without_calculation_or_post_observation_llm_call
 
     assert result["tools_used"] == ["get_employee_data", "lookup_annual_leave_policy"]
     assert calls == {"employee": 1, "policy": 1, "calculation": 0}
-    assert chat.calls == 2
+    assert chat.calls == 1
     assert result["answer"] == "Employees may encash a maximum of 5 days per calendar year."
     assert result["termination_reason"] is None
 
@@ -654,6 +723,52 @@ def test_recommended_next_tool_is_enforced_for_missing_policy_state(monkeypatch)
     tool_names = [step["tool"] for step in result["steps"] if step.get("phase") == "tool"]
     assert tool_names == [
         "get_employee_data",
+        "lookup_annual_leave_policy",
+        "calculate_annual_leave_disposition",
+    ]
+    assert result["answer"] == "10 days can be carried over, 5 days can be encashed, and 10 days lapse."
+
+
+def test_recoverable_mcp_error_advances_to_recommended_tool(monkeypatch):
+    """A recoverable MCP error must continue the missing-information flow rather than stop."""
+    _install_policy_stub(monkeypatch)
+
+    def failing_policy(**kwargs):
+        return {
+            "error": "mcp transport failed while reading policy",
+            "recoverable": True,
+            "tool": "mcp_lookup_annual_leave_policy",
+            "arguments": kwargs,
+        }
+
+    spec = agent.MCP_TOOLS["mcp_lookup_annual_leave_policy"]
+    monkeypatch.setattr(spec, "callable", failing_policy)
+    monkeypatch.setattr(spec, "input_schema", {
+        "type": "object",
+        "properties": {"jurisdiction": {"type": "string"}},
+        "required": ["jurisdiction"],
+        "additionalProperties": False,
+    })
+
+    chat = ChatSequence([
+        {"action": "tool", "tool": "get_employee_data", "arguments": {"employee_id": "005"}},
+        {"action": "tool", "tool": "mcp_lookup_annual_leave_policy", "arguments": {"jurisdiction": "INDIA"}},
+        {"action": "tool", "tool": "lookup_annual_leave_policy", "arguments": {"jurisdiction": "INDIA"}},
+        {"action": "tool", "tool": "calculate_annual_leave_disposition",
+         "arguments": {"leave_balance": 20, "carry_over_limit": 10, "encashment_limit": 5}},
+        {"action": "final", "answer": "10 days can be carried over, 5 days can be encashed, and 10 days lapse."},
+    ])
+
+    result = agent.run_agent(
+        "For employee 005, give the full annual leave disposition.",
+        chat_fn=chat,
+        prefer_mcp_tools=True,
+    )
+
+    tool_names = [step["tool"] for step in result["steps"] if step.get("phase") == "tool"]
+    assert tool_names == [
+        "get_employee_data",
+        "mcp_lookup_annual_leave_policy",
         "lookup_annual_leave_policy",
         "calculate_annual_leave_disposition",
     ]

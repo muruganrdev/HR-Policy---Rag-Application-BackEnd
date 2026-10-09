@@ -64,6 +64,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
 # EMPLOYEE TOOLS
 # ===========================================================================
 
+# Tool - 1
 def get_employee_data(
     employee_id: str | None = None,
     employee_name: str | None = None,
@@ -134,7 +135,7 @@ def get_employee_data(
             )
         return _row_to_dict(rows[0])
 
-
+# Tool - 2
 def get_department_employees(department_name: str) -> dict[str, Any]:
     """Return a list of employees in a given department.
 
@@ -164,7 +165,7 @@ def get_department_employees(department_name: str) -> dict[str, Any]:
         "employees": employees,
     }
 
-
+# Tool - 3
 def get_employees_by_manager(manager_name: str) -> dict[str, Any]:
     """Return employees whose manager_name matches the supplied name.
 
@@ -198,6 +199,7 @@ def get_employees_by_manager(manager_name: str) -> dict[str, Any]:
 # POLICY TOOLS
 # ===========================================================================
 
+# Tool - 4
 def lookup_annual_leave_policy(jurisdiction: Jurisdiction) -> dict[str, Any]:
     """Retrieve annual-leave carry-over and encashment policy evidence.
 
@@ -223,7 +225,7 @@ def lookup_annual_leave_policy(jurisdiction: Jurisdiction) -> dict[str, Any]:
 # ===========================================================================
 # CALCULATION TOOLS
 # ===========================================================================
-
+# Tool - 5
 def calculate_annual_leave_disposition(
     leave_balance: float,
     carry_over_limit: float,

@@ -153,7 +153,7 @@ All tests were executed against `tests/test_security_controls.py` and `tests/tes
 
 ## 7. Production vs Harness Coverage
 
-**Production-integrated:** Registered-tool allowlisting, task-scoped capability and entity checks, database grounding for IDs/names/departments/managers, jurisdiction validation, tool-result schemas, calculation input/output grounding, result minimization, untrusted request/result framing, and final-answer validation.
+**Production-integrated:** Registered-tool allowlisting, task-scoped tool and entity checks, database grounding for IDs/names/departments/managers, jurisdiction validation, tool-result schemas, calculation input/output grounding, result minimization, untrusted request/result framing, and final-answer validation.
 
 **Harness-only:** The `GuardedChat` injection experiment adds a test-scoped authorization boundary and reports attack provenance. It supplements, but does not replace, production checks. The harness-only provenance reporting is not a production control. Tests do not prove protection against every novel or obfuscated multi-turn injection.
 

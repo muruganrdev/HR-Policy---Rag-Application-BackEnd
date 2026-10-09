@@ -1,0 +1,217 @@
+{
+  "hr_policy_server": {
+    "initialize": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "protocolVersion": "2025-06-18",
+        "capabilities": {
+          "tools": {
+            "listChanged": false
+          }
+        },
+        "serverInfo": {
+          "name": "hr_policy_server",
+          "version": "1.0.0"
+        }
+      }
+    },
+    "tool_count": 4,
+    "tools": [
+      {
+        "name": "get_employee_data",
+        "description": "Fetch one employee record by ID or name.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "employee_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "employee_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_department_employees",
+        "description": "List employees in a department.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "department_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "department_name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_employees_by_manager",
+        "description": "List the direct reports to a manager.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "manager_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "manager_name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "lookup_annual_leave_policy",
+        "description": "Fetch annual leave policy evidence for INDIA.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "jurisdiction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "jurisdiction"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
+  },
+  "hris_server": {
+    "initialize": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "protocolVersion": "2025-06-18",
+        "capabilities": {
+          "tools": {
+            "listChanged": false
+          }
+        },
+        "serverInfo": {
+          "name": "hris_server",
+          "version": "1.0.0"
+        }
+      }
+    },
+    "tool_count": 3,
+    "tools": [
+      {
+        "name": "hris_get_employee_snapshot",
+        "description": "Retrieve a compact employee snapshot with salary and leave balance.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "employee_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "employee_name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "hris_get_department_roster",
+        "description": "List the employees in a department for roster questions.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "department_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "department_name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "hris_get_manager_team",
+        "description": "List direct reports under a manager.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "manager_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "manager_name"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ],
+    "department_roster_call": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"department\": \"Engineering\",\n  \"count\": 2,\n  \"employees\": [\n    {\n      \"employee_id\": \"003\",\n      \"employee_name\": \"Neha Iyer\",\n      \"designation\": \"Software Engineer\",\n      \"employment_status\": \"Active\",\n      \"manager_name\": \"Arun Kumar\",\n      \"work_mode\": \"Hybrid\"\n    },\n    {\n      \"employee_id\": \"004\",\n      \"employee_name\": \"Arjun Menon\",\n      \"designation\": \"Senior Software Engineer\",\n      \"employment_status\": \"Active\",\n      \"manager_name\": \"Arun Kumar\",\n      \"work_mode\": \"Hybrid\"\n    }\n  ]\n}"
+          }
+        ],
+        "structuredContent": {
+          "department": "Engineering",
+          "count": 2,
+          "employees": [
+            {
+              "employee_id": "003",
+              "employee_name": "Neha Iyer",
+              "designation": "Software Engineer",
+              "employment_status": "Active",
+              "manager_name": "Arun Kumar",
+              "work_mode": "Hybrid"
+            },
+            {
+              "employee_id": "004",
+              "employee_name": "Arjun Menon",
+              "designation": "Senior Software Engineer",
+              "employment_status": "Active",
+              "manager_name": "Arun Kumar",
+              "work_mode": "Hybrid"
+            }
+          ]
+        }
+      }
+    },
+    "employee_snapshot_call": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"employee_id\": \"005\",\n  \"employee_name\": \"Priya Nair\",\n  \"department\": \"Product\",\n  \"designation\": \"Product Manager\",\n  \"annual_salary\": 1800000.0,\n  \"leave_balance\": 20.0,\n  \"manager_name\": \"Deepak Sharma\"\n}"
+          }
+        ],
+        "structuredContent": {
+          "employee_id": "005",
+          "employee_name": "Priya Nair",
+          "department": "Product",
+          "designation": "Product Manager",
+          "annual_salary": 1800000.0,
+          "leave_balance": 20.0,
+          "manager_name": "Deepak Sharma"
+        }
+      }
+    }
+  }
+}

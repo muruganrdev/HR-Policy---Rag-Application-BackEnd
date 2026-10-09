@@ -225,7 +225,7 @@ def test_api_isolates_conversations_and_new_chat_does_not_guess(api_module):
 def test_api_keeps_rag_policy_follow_up_on_existing_rag_path(api_module):
     api, agent_calls, rag_calls = api_module
     api.ask(api.QuestionRequest(
-        question="What is the annual leave policy for India?",
+        question="What is the work from home policy for India?",
         conversation_id="policy-chat",
     ))
     follow_up = "How many days can be carried forward?"
@@ -259,4 +259,4 @@ def test_api_request_without_conversation_id_keeps_legacy_agent_call(api_module)
     response = api.ask(api.QuestionRequest(question=question))
 
     assert response["question"] == question
-    assert agent_calls[0] == (question, {})
+    assert agent_calls[0] == (question, {"prefer_mcp_tools": True})

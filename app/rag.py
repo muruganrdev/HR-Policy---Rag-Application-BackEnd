@@ -1,5 +1,7 @@
-import re
+import contextlib
+import logging
 import os
+import re
 import time
 
 import chromadb
@@ -102,10 +104,16 @@ collection = client.get_collection(
 # 4. Observability helpers (no-op safe)
 # --------------------------------
 
-import contextlib
-import logging
-
 _obs_logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _log_pipeline_stage(stage: str):
+    try:
+        yield
+    except Exception:
+        _obs_logger.exception("RAG pipeline failed at stage=%s", stage)
+        raise
 
 @contextlib.contextmanager
 def _observe_span(name: str, input=None):
@@ -264,16 +272,19 @@ def ask_question(question: str):
     # --------------------------------
 
     # ── Preprocessing ────────────────────────────────────────────────────────
-    with _observe_span("preprocessing", input={"raw_question": question}):
-        processed_question = preprocess_question(question)
+    with _log_pipeline_stage("preprocessing"):
+        with _observe_span("preprocessing", input={"raw_question": question}):
+            processed_question = preprocess_question(question)
 
     # ── Query rewrite ────────────────────────────────────────────────────────
-    with _observe_span("query_rewrite", input={"preprocessed": processed_question}):
-        rewritten_question = rewrite_question(processed_question)
+    with _log_pipeline_stage("query_rewrite"):
+        with _observe_span("query_rewrite", input={"preprocessed": processed_question}):
+            rewritten_question = rewrite_question(processed_question)
 
     # ── Query expansion ──────────────────────────────────────────────────────
-    with _observe_span("query_expansion", input={"rewritten": rewritten_question}):
-        expanded_query = expand_query(rewritten_question)
+    with _log_pipeline_stage("query_expansion"):
+        with _observe_span("query_expansion", input={"rewritten": rewritten_question}):
+            expanded_query = expand_query(rewritten_question)
 
     print(f"Original question: {question}")
     print(f"Preprocessed question: {processed_question}")
@@ -281,9 +292,10 @@ def ask_question(question: str):
     print(f"Expanded query: {expanded_query}")
 
     # ── Embedding ────────────────────────────────────────────────────────────
-    with _observe_span("embedding", input={"query": expanded_query,
-                                           "model": "all-MiniLM-L6-v2"}):
-        query_embedding = embedding_model.encode(expanded_query).tolist()
+    with _log_pipeline_stage("embedding"):
+        with _observe_span("embedding", input={"query": expanded_query,
+                                               "model": "all-MiniLM-L6-v2"}):
+            query_embedding = embedding_model.encode(expanded_query).tolist()
 
 
     # --------------------------------
@@ -292,15 +304,16 @@ def ask_question(question: str):
 
     # ── Vector retrieval ─────────────────────────────────────────────────────
     _t_retr = time.time()
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=N_RESULTS,
-        include=[
-            "documents",
-            "metadatas",
-            "distances"
-        ]
-    )
+    with _log_pipeline_stage("vector_retrieval"):
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=N_RESULTS,
+            include=[
+                "documents",
+                "metadatas",
+                "distances"
+            ]
+        )
     _retr_latency = round((time.time() - _t_retr) * 1000, 2)
 
     documents = results["documents"][0]
@@ -325,11 +338,12 @@ def ask_question(question: str):
     )
 
     # ── Reranking ────────────────────────────────────────────────────────────
-    with _observe_span("reranking", input={"n_candidates": len(documents)}):
-        # Rerank retrieved documents using CrossEncoder
-        documents, metadatas, distances = rerank_documents(
-            expanded_query, documents, metadatas, distances
-        )
+    with _log_pipeline_stage("reranking"):
+        with _observe_span("reranking", input={"n_candidates": len(documents)}):
+            # Rerank retrieved documents using CrossEncoder
+            documents, metadatas, distances = rerank_documents(
+                expanded_query, documents, metadatas, distances
+            )
 
 
     # --------------------------------
@@ -341,30 +355,31 @@ def ask_question(question: str):
     _filtered_in = []
     _filtered_out = []
 
-    for _rank, (document, metadata, distance) in enumerate(
-        zip(documents, metadatas, distances), start=1
-    ):
-        _src = metadata["source"]
-        _chk = metadata["chunk_index"]
+    with _log_pipeline_stage("context_assembly"):
+        for _rank, (document, metadata, distance) in enumerate(
+            zip(documents, metadatas, distances), start=1
+        ):
+            _src = metadata["source"]
+            _chk = metadata["chunk_index"]
 
-        # Discard irrelevant chunks beyond threshold
-        if distance > DISTANCE_THRESHOLD:
-            _filtered_out.append({"rank": _rank, "source": _src,
-                                   "chunk_index": _chk, "distance": round(distance, 4)})
-            continue
+            # Discard irrelevant chunks beyond threshold
+            if distance > DISTANCE_THRESHOLD:
+                _filtered_out.append({"rank": _rank, "source": _src,
+                                       "chunk_index": _chk, "distance": round(distance, 4)})
+                continue
 
-        _filtered_in.append({"rank": _rank, "source": _src,
-                              "chunk_index": _chk, "distance": round(distance, 4)})
+            _filtered_in.append({"rank": _rank, "source": _src,
+                                  "chunk_index": _chk, "distance": round(distance, 4)})
 
-        source = _src
-        chunk_index = _chk
+            source = _src
+            chunk_index = _chk
 
-        # Complete only fixed-size chunks that end mid-word.
-        document = _append_chunk_continuation(document, metadata)
+            # Complete only fixed-size chunks that end mid-word.
+            document = _append_chunk_continuation(document, metadata)
 
-        # Build a clearly bounded policy block without changing the retrieved text.
-        context_parts.append(
-            f"""
+            # Build a clearly bounded policy block without changing the retrieved text.
+            context_parts.append(
+                f"""
     === POLICY SOURCE ===
     File: {source}
 Chunk: {chunk_index}
@@ -373,13 +388,13 @@ Chunk: {chunk_index}
 {document}
     === END POLICY SOURCE ===
 """
-        )
+            )
 
-        # Store citation for the response
-        relevant_sources.append({
-            "source": source,
-            "chunk": chunk_index
-        })
+            # Store citation for the response
+            relevant_sources.append({
+                "source": source,
+                "chunk": chunk_index
+            })
 
     # ── Distance filtering observation event ─────────────────────────────────
     _observe_filtering_event(
@@ -495,21 +510,22 @@ Answer:
 
     # ── LLM generation ──────────────────────────────────────────────────────
     _t_llm = time.time()
-    with _observe_span("llm_generation", input={
-        "model": OLLAMA_MODEL,
-        "n_context_chunks": len(context_parts),
-        "question": question,
-    }):
-        response = ollama.chat(
-            model=OLLAMA_MODEL,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            options={"temperature": 0.0},
-        )
+    with _log_pipeline_stage("llm_generation"):
+        with _observe_span("llm_generation", input={
+            "model": OLLAMA_MODEL,
+            "n_context_chunks": len(context_parts),
+            "question": question,
+        }):
+            response = ollama.chat(
+                model=OLLAMA_MODEL,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                options={"temperature": 0.0},
+            )
     _llm_latency = round((time.time() - _t_llm) * 1000, 2)
 
 
@@ -517,7 +533,8 @@ Answer:
     # Extract answer text
     # --------------------------------
 
-    answer = response["message"]["content"]
+    with _log_pipeline_stage("response_parsing"):
+        answer = response["message"]["content"]
 
 
     # --------------------------------

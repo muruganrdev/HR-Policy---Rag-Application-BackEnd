@@ -112,8 +112,8 @@ def test_6_full_disposition_no_extra_decision_call_after_calculation():
         "lookup_annual_leave_policy",
         "calculate_annual_leave_disposition",
     ]
-    # Exactly 3 model decision calls — no 4th LLM call needed after calculation observation
-    assert chat.calls == 3
+    # Required observations are sufficient after calculation, so the Agent finalizes without a 4th decision call.
+    assert chat.calls == 1
     assert "10 days can be carried over" in result["answer"]
 
 

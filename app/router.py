@@ -84,7 +84,7 @@ _EMPLOYEE_LOOKUP_NAME_PATTERNS = (
 # Department/manager/team query indicators
 TEAM_QUERY_PATTERNS = re.compile(
     r"\b(?:who\s+(?:works?\s+in|is\s+in|are\s+in|reports?\s+to)|"
-    r"(?:which\s+)?employees?\s+(?:are\s+|is\s+)?(?:in|working\s+in)\s+|"
+    r"(?:which\s+)?employees?\s+(?:(?:are|is|work|works)\s+in|working\s+in)\s+|"
     r"(?:employees?\s+in)\s+(?:the\s+)?(?:\w+\s+)?department|"
     r"(?:list|show|get)\s+(?:all\s+)?employees?\s+(?:in|from|of)|"
     r"department\s+(?:members?|employees?|staff|team)|"
@@ -149,6 +149,12 @@ def route_question(question: str) -> str:
 
     # Check team/department queries
     if _is_team_query(q):
+        return "agent"
+
+    # Annual-leave policy evidence is exposed by the configured HR Policy MCP server.
+    if re.search(r"\bannual\s+leave\b", q, re.IGNORECASE) and re.search(
+        r"\b(?:policy|carry|encash|lapse|limit|entitlement)\b", q, re.IGNORECASE
+    ):
         return "agent"
 
     return "rag"
