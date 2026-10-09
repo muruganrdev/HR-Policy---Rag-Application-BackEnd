@@ -1,7 +1,7 @@
 # Run Commands
 
 .\venv\Scripts\Activate.ps1    
-uvicorn app.main:app --reload --port 8001
+python -m uvicorn app.main:app --reload --port 8001
 ollama list
 
 one line command week 6 : .\venv\Scripts\python.exe evaluation\run_week6_eval.py

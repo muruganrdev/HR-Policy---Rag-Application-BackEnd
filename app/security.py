@@ -125,6 +125,12 @@ class ToolAuthorization:
     allowed_department_names: frozenset[str] | None = None
     allowed_manager_names: frozenset[str] | None = None
     expected_calculation_inputs: dict[str, float] | None = None
+    user_role: str | None = None
+    user_employee_id: str | None = None
+    user_employee_name: str | None = None
+    is_trusted_principal: bool = False
+    is_legacy: bool = False
+
 
 
 class SecurityValidationError(ValueError):
@@ -273,8 +279,9 @@ def authorization_for_question(
     *,
     employee_record: dict[str, Any] | None = None,
     policy_result: dict[str, Any] | None = None,
+    role_context: dict[str, Any] | None = None,
 ) -> ToolAuthorization:
-    """Build task-scoped tool and entity permissions from the user question."""
+    """Build task-scoped tool and entity permissions from the user question and role context."""
     question = _task_scope_question(question)
     allowed_tools = minimum_tools_for_question(question, registered_tools)
     employee_ids = frozenset(
@@ -298,6 +305,71 @@ def authorization_for_question(
     employee_ids = employee_ids | _database_employee_ids(employee_names)
     employee_names = employee_names | _database_employee_names(employee_ids)
 
+    user_role = None
+    user_employee_id = None
+    user_employee_name = None
+    is_trusted_principal = False
+    is_legacy = False
+    department_names = (
+        frozenset({department_match.group(1).strip()}) if department_match else None
+    )
+    manager_names = (
+        frozenset({manager_match.group(1).strip()}) if manager_match else None
+    )
+
+    if role_context is not None:
+        user_role = role_context.get("role")
+        user_employee_id = role_context.get("employee_id")
+        user_employee_name = role_context.get("employee_name")
+        is_trusted_principal = bool(role_context.get("is_trusted_principal", False))
+        is_legacy = bool(role_context.get("is_legacy", False))
+
+        if is_legacy:
+            employee_ids = frozenset()
+            employee_names = frozenset()
+            department_names = frozenset()
+            manager_names = frozenset()
+        elif user_role == "Super Admin":
+            if is_trusted_principal:
+                employee_ids = None
+                employee_names = None
+            else:
+                employee_ids = frozenset()
+                employee_names = frozenset()
+                department_names = frozenset()
+                manager_names = frozenset()
+        elif user_role == "Employee":
+            employee_ids = frozenset({user_employee_id}) if user_employee_id else frozenset()
+            employee_names = frozenset({user_employee_name.casefold()}) if user_employee_name else _database_employee_names(employee_ids)
+            department_names = frozenset()
+            manager_names = frozenset()
+        elif user_role == "Manager":
+            try:
+                with sqlite3.connect(DATABASE_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT manager_name FROM employees WHERE employee_id = ?",
+                        (user_employee_id,),
+                    ).fetchone()
+                    mgr_team_name = row[0] if row else user_employee_name
+                    team_rows = conn.execute(
+                        "SELECT employee_id, employee_name FROM employees WHERE manager_name = ? OR manager_name = ?",
+                        (mgr_team_name, user_employee_name),
+                    ).fetchall()
+                    team_ids = {r[0] for r in team_rows}
+                    if user_employee_id:
+                        team_ids.add(user_employee_id)
+                    team_names = {r[1].casefold() for r in team_rows}
+                    if user_employee_name:
+                        team_names.add(user_employee_name.casefold())
+                employee_ids = frozenset(team_ids)
+                employee_names = frozenset(team_names)
+                manager_names = (frozenset({mgr_team_name, user_employee_name}) - {None}) or manager_names
+            except Exception:
+                employee_ids = frozenset({user_employee_id}) if user_employee_id else frozenset()
+                employee_names = frozenset({user_employee_name.casefold()}) if user_employee_name else frozenset()
+    else:
+        employee_ids = employee_ids or None
+
     expected_inputs = None
     if employee_record is not None and policy_result is not None:
         carryover = _extract_policy_limit(policy_result, "carry_over")
@@ -318,17 +390,19 @@ def authorization_for_question(
     return ToolAuthorization(
         registered_tools=registered_tools,
         allowed_tools=frozenset(allowed_tools & registered_tools),
-        allowed_employee_ids=employee_ids or None,
+        allowed_employee_ids=employee_ids,
         allowed_employee_names=employee_names,
         allowed_employee_fields=frozenset(allowed_employee_fields),
-        allowed_department_names=(
-            frozenset({department_match.group(1).strip()}) if department_match else None
-        ),
-        allowed_manager_names=(
-            frozenset({manager_match.group(1).strip()}) if manager_match else None
-        ),
+        allowed_department_names=department_names,
+        allowed_manager_names=manager_names,
         expected_calculation_inputs=expected_inputs,
+        user_role=user_role,
+        user_employee_id=user_employee_id,
+        user_employee_name=user_employee_name,
+        is_trusted_principal=is_trusted_principal,
+        is_legacy=is_legacy,
     )
+
 
 
 def _extract_policy_limit(policy_result: dict[str, Any], kind: str) -> float | None:
@@ -530,12 +604,28 @@ def validate_tool_call(
                 authorization.allowed_employee_ids is not None
                 and value not in authorization.allowed_employee_ids
             ):
+                if authorization.user_role == "Super Admin" and not authorization.is_trusted_principal:
+                    raise PermissionError("Super Admin access requires a trusted authenticated identity.")
+                if authorization.user_role == "Manager":
+                    raise PermissionError("Access denied: employee is outside your authorized team.")
+                if authorization.user_role == "Employee":
+                    raise PermissionError("Access denied: your selected role does not have permission to view this employee.")
+                if authorization.is_legacy:
+                    raise PermissionError("Access denied: role context is required to view employee records. Please select a demo role.")
                 raise PermissionError(f"Employee ID is not authorized: {value}")
         elif (
             authorization.allowed_employee_names is not None
             and value.casefold()
             not in {name.casefold() for name in authorization.allowed_employee_names}
         ):
+            if authorization.user_role == "Super Admin" and not authorization.is_trusted_principal:
+                raise PermissionError("Super Admin access requires a trusted authenticated identity.")
+            if authorization.user_role == "Manager":
+                raise PermissionError("Access denied: employee is outside your authorized team.")
+            if authorization.user_role == "Employee":
+                raise PermissionError("Access denied: your selected role does not have permission to view this employee.")
+            if authorization.is_legacy:
+                raise PermissionError("Access denied: role context is required to view employee records. Please select a demo role.")
             raise PermissionError(f"Employee name is not authorized: {value}")
         normalized[key] = value
         column = "employee_id" if has_id else "employee_name"
@@ -568,7 +658,16 @@ def validate_tool_call(
         if allowed_values is not None and value.casefold() not in {
             item.casefold() for item in allowed_values
         }:
+            if authorization.user_role == "Super Admin" and not authorization.is_trusted_principal:
+                raise PermissionError("Super Admin access requires a trusted authenticated identity.")
+            if authorization.user_role == "Manager":
+                raise PermissionError("Access denied: employee is outside your authorized team.")
+            if authorization.user_role == "Employee":
+                raise PermissionError("Access denied: your selected role does not have permission to view this employee.")
+            if authorization.is_legacy:
+                raise PermissionError("Access denied: role context is required to view employee records. Please select a demo role.")
             raise PermissionError(f"{key} is not authorized for this task")
+
         normalized[key] = value
         column = "department" if tool_name == "get_department_employees" else "manager_name"
         if not _database_value_exists(column, value):

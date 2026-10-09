@@ -277,10 +277,12 @@ class AgentState:
     final_answer: str | None = None
     trace_lines: list[str] = field(default_factory=list)
     budget: BudgetState | None = None
+    role_context: dict[str, Any] | None = None
 
     @property
     def active_question(self) -> str:
         return self.resolved_question or self.original_question
+
 
 
 # ---------------------------------------------------------------------------
@@ -997,6 +999,7 @@ def _authorization_for_state(state: AgentState) -> ToolAuthorization:
         all_registered_tools(),
         employee_record=state.employee_record,
         policy_result=state.policy_result,
+        role_context=state.role_context,
     )
 
 
@@ -1018,6 +1021,7 @@ def _validated_state_result(
         frozenset(TOOLS),
         employee_record=employee_record,
         policy_result=policy_result,
+        role_context=state.role_context,
     )
     return minimize_tool_result(tool_name, validated, result_authorization)
 
@@ -1051,18 +1055,21 @@ def execute_tool(
                 raise SecurityValidationError(
                     f"Arguments do not match the discovered schema for {tool_name}: {error.message}"
                 ) from error
-    else:
-        try:
-            arguments = validate_tool_call(
-                tool_name,
-                arguments,
-                authorization,
-                input_schema=spec.input_schema if tool_name in MCP_TOOLS else None,
-            )
-        except SecurityValidationError as error:
-            raise SecurityValidationError(str(error)) from error
-        except (ValueError, PermissionError) as error:
-            raise SecurityValidationError(str(error)) from error
+
+    try:
+        arguments = validate_tool_call(
+            tool_name,
+            arguments,
+            authorization,
+            input_schema=spec.input_schema if tool_name in MCP_TOOLS else None,
+        )
+    except SecurityValidationError as error:
+        raise SecurityValidationError(str(error)) from error
+    except PermissionError as error:
+        raise PermissionError(str(error)) from error
+    except ValueError as error:
+        raise SecurityValidationError(str(error)) from error
+
 
     try:
         if tool_name not in {"get_employee_data", "get_department_employees", "get_employees_by_manager", "lookup_annual_leave_policy", "calculate_annual_leave_disposition"}:
@@ -1275,6 +1282,18 @@ def _generate_final_answer(
             )
             return f"{name}'s {details}."
 
+    role_instruction = ""
+    if state.role_context:
+        role = state.role_context.get("role")
+        emp_name = state.role_context.get("employee_name")
+        emp_id = state.role_context.get("employee_id")
+        if role == "Employee":
+            role_instruction = f" User context: Employee {emp_name} (ID: {emp_id}). Tailor the explanation with employee guidance."
+        elif role == "Manager":
+            role_instruction = f" User context: Manager {emp_name} (ID: {emp_id}). Tailor the explanation with managerial guidance."
+        elif role == "Super Admin":
+            role_instruction = " User context: Super Admin. Tailor the explanation with administrative guidance."
+
     request = {
         "model": OLLAMA_MODEL,
         "messages": [
@@ -1286,6 +1305,7 @@ def _generate_final_answer(
                     "If the observation contains a calculation_result, treat it as authoritative — "
                     "report the exact calculated values (carryover_days, encashable_days, lapsed_days). "
                     "Return only a concise, plain-text final answer."
+                    + role_instruction
                 ),
             },
             {
@@ -1343,6 +1363,7 @@ def run_agent(
     max_wall_clock_seconds: float = MAX_WALL_CLOCK_SECONDS,
     cost_per_1k_tokens: float = COST_PER_1K_TOKENS,
     monotonic_fn: Callable[[], float] = time.monotonic,
+    role_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run the THINK → DO → OBSERVE loop until final or safety stop."""
     history = [
@@ -1357,7 +1378,9 @@ def run_agent(
         resolved_question=question,
         conversation_history=history,
         prefer_mcp_tools=prefer_mcp_tools,
+        role_context=role_context,
     )
+
     state.budget = BudgetState(
         max_iterations=max_iterations,
         max_tokens=max_tokens,
@@ -1626,6 +1649,25 @@ def run_agent(
                 state.policy_result = result
             elif tool_name == "calculate_annual_leave_disposition":
                 state.calculation_result = result
+        except PermissionError as error:
+            observation = {"status": "error", "error": str(error)}
+            state.steps.append(
+                {
+                    "phase": "tool",
+                    "tool": tool_name,
+                    "arguments": _json_safe(arguments),
+                    "observation": _json_safe(observation),
+                }
+            )
+            state.final_answer = str(error)
+            state.steps.append({"phase": "final", "answer": state.final_answer})
+            _emit(state, f"[STEP {state.iteration_count}] OBSERVE")
+            _emit(
+                state,
+                f"Observation: {json.dumps(_json_safe(observation), sort_keys=True)}",
+            )
+            _emit(state, f"[FINAL]\n{state.final_answer}")
+            break
         except SecurityValidationError as error:
             observation = {"status": "error", "error": str(error)}
             security_failure = True
@@ -1654,6 +1696,7 @@ def run_agent(
             state.steps.append({"phase": "final", "answer": state.final_answer})
             _emit(state, f"[FINAL]\n{state.final_answer}")
             break
+
 
         if observation.get("status") == "not_found":
             state.final_answer = _employee_not_found_answer(observation["result"])

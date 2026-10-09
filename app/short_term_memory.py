@@ -39,27 +39,67 @@ class ShortTermConversationMemory:
         self._histories: OrderedDict[str, list[dict[str, str]]] = OrderedDict()
         self._lock = RLock()
 
-    def get_history(self, conversation_id: str) -> list[dict[str, str]]:
-        """Return a copy so callers cannot mutate stored conversation state."""
+    def get_history(
+        self,
+        conversation_id: str,
+        *,
+        role: str | None = None,
+        employee_id: str | None = None,
+    ) -> list[dict[str, str]]:
+        """Return a copy so callers cannot mutate stored conversation state.
+
+        If a conversation ID is reused with a different role or identity, the previous
+        conversation history is evicted immediately to prevent data leakage across roles.
+        """
         with self._lock:
-            history = self._histories.get(conversation_id)
-            if history is None:
+            entry = self._histories.get(conversation_id)
+            if entry is None:
                 return []
+            if isinstance(entry, dict):
+                stored_role = entry.get("role")
+                stored_emp_id = entry.get("employee_id")
+                # If a role or identity was stored or is requested, verify they match
+                if (stored_role is not None or role is not None) and (stored_role != role or stored_emp_id != employee_id):
+                    self._histories.pop(conversation_id, None)
+                    return []
+                messages = entry.get("messages", [])
+            else:
+                messages = entry
             self._histories.move_to_end(conversation_id)
-            return [dict(message) for message in history]
+            return [dict(message) for message in messages]
 
     def add_exchange(
-        self, conversation_id: str, question: str, answer: str
+        self,
+        conversation_id: str,
+        question: str,
+        answer: str,
+        *,
+        role: str | None = None,
+        employee_id: str | None = None,
     ) -> None:
-        """Append one user/assistant turn and keep only the newest turns."""
-        messages = [
+        """Append one user/assistant turn and keep only the newest turns, bound to the caller's role context."""
+        new_turns = [
             {"role": "user", "content": str(question)},
             {"role": "assistant", "content": str(answer)},
         ]
         with self._lock:
-            history = self._histories.pop(conversation_id, [])
-            history.extend(messages)
-            self._histories[conversation_id] = history[-self.max_turns * 2 :]
+            entry = self._histories.pop(conversation_id, None)
+            if isinstance(entry, dict):
+                if entry.get("role") != role or entry.get("employee_id") != employee_id:
+                    existing_messages = []
+                else:
+                    existing_messages = entry.get("messages", [])
+            elif isinstance(entry, list):
+                existing_messages = entry
+            else:
+                existing_messages = []
+
+            existing_messages.extend(new_turns)
+            self._histories[conversation_id] = {
+                "messages": existing_messages[-self.max_turns * 2 :],
+                "role": role,
+                "employee_id": employee_id,
+            }
             while len(self._histories) > self.max_conversations:
                 self._histories.popitem(last=False)
 
@@ -104,3 +144,18 @@ def resolve_employee_reference(
         question,
     )
     return _REFERENCE_PATTERN.sub(employee_name, resolved)
+
+
+_MY_HR_REFERENCE = re.compile(
+    r"\bmy\s+((?:(?:annual|sick)\s+)?(?:leave(?:\s+balance)?|salary|pay|department|designation|role|job title|"
+    r"email|phone|work mode|employment status|employment type|manager|location|tenure|balance))\b",
+    re.IGNORECASE,
+)
+
+
+def resolve_self_reference(question: str, employee_name: str | None) -> str:
+    """Resolve first-person references like 'my salary' to the selected employee identity."""
+    if not employee_name or not str(employee_name).strip():
+        return question
+    name = str(employee_name).strip()
+    return _MY_HR_REFERENCE.sub(rf"{name}'s \1", question)

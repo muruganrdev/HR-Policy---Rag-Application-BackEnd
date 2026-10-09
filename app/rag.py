@@ -237,7 +237,8 @@ def _append_chunk_continuation(document: str, metadata: dict) -> str:
 # --------------------------------
 
 @observe(name="hr_rag_pipeline")
-def ask_question(question: str):
+def ask_question(question: str, role_context: dict | None = None):
+
     """
     Full HR Policy RAG pipeline:
       1. Check for casual conversation
@@ -448,12 +449,30 @@ Chunk: {chunk_index}
         }
 
 
-    # --------------------------------
-    # Grounded prompt — HR Policy domain
-    # --------------------------------
+    role_guidance = ""
+    if role_context:
+        role = role_context.get("role")
+        emp_name = role_context.get("employee_name")
+        emp_id = role_context.get("employee_id")
+        if role == "Employee":
+            role_guidance = (
+                f"\nRole Guidance: The user is asking as Employee '{emp_name}' (ID: {emp_id}). "
+                "Tailor explanations to an employee perspective (individual entitlements, steps to apply, employee rights)."
+            )
+        elif role == "Manager":
+            role_guidance = (
+                f"\nRole Guidance: The user is asking as Manager '{emp_name}' (ID: {emp_id}). "
+                "Tailor explanations to a managerial perspective (team oversight, approval workflows, management responsibilities)."
+            )
+        elif role == "Super Admin":
+            role_guidance = (
+                "\nRole Guidance: The user is asking as Super Admin. "
+                "Tailor explanations to an administrative perspective (policy compliance, organization-wide rules, system setup)."
+            )
 
     prompt = f"""
 You are a helpful HR Policy assistant.
+{role_guidance}
 
 Answer the original user question using ONLY the supplied policy context.
 Before writing, identify every policy statement that directly governs the
@@ -496,6 +515,7 @@ do not invent an answer.
 
 Context:
 {context}
+
 
 User Question:
 {question}

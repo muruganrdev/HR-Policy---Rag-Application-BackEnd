@@ -1,4 +1,5 @@
 import logging
+import os
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -10,6 +11,7 @@ from app.agent import run_agent
 from app.short_term_memory import (
 	ShortTermConversationMemory,
 	resolve_employee_reference,
+	resolve_self_reference,
 )
 from app.tools import DATABASE_PATH
 
@@ -17,11 +19,25 @@ router = APIRouter()
 _logger = logging.getLogger(__name__)
 _conversation_memory = ShortTermConversationMemory()
 DEMO_MANAGER_NAMES = ("Arun Kumar", "Deepak Sharma")
+ALLOWED_DEMO_ROLES = {"Super Admin", "Manager", "Employee"}
+
+
+def is_demo_super_admin_enabled() -> bool:
+	"""Check whether the explicit local demo Super Admin configuration is active.
+
+	Defaults to True for local development/demo. When False, untrusted Super Admin
+	requests fail closed until authenticated via a trusted principal.
+	"""
+	return os.getenv("ENABLE_DEMO_SUPER_ADMIN", "true").lower() in ("true", "1", "yes")
 
 
 class QuestionRequest(BaseModel):
 	question: str
 	conversation_id: str | None = Field(default=None, min_length=1, max_length=128)
+	role: str | None = Field(default=None, max_length=50)
+	employee_id: str | None = Field(default=None, max_length=20)
+	employee_name: str | None = Field(default=None, max_length=120)
+
 
 
 class RoleAccessContext(BaseModel):
@@ -229,19 +245,115 @@ def _extract_agent_sources(steps: list[dict]) -> list[dict]:
 	return sources
 
 
+def _validate_role_context(
+	request: QuestionRequest,
+	principal: RoleAccessPrincipal | None,
+) -> dict[str, Any] | None:
+	if request.role is None:
+		return {
+			"role": None,
+			"employee_id": None,
+			"employee_name": None,
+			"is_trusted_principal": False,
+			"is_legacy": True,
+		}
+
+	role = request.role.strip()
+	if role not in ALLOWED_DEMO_ROLES:
+		raise HTTPException(
+			status_code=400,
+			detail=f"Unsupported role '{role}'. Allowed roles: {', '.join(sorted(ALLOWED_DEMO_ROLES))}",
+		)
+
+	is_trusted_principal = (principal is not None and principal.role == "Super Admin")
+
+	if role == "Super Admin":
+		if not is_trusted_principal and is_demo_super_admin_enabled():
+			is_trusted_principal = True
+		emp_id = (request.employee_id or "001").strip()
+		emp_name = (request.employee_name or "Administrator").strip()
+		return {
+			"role": "Super Admin",
+			"employee_id": emp_id,
+			"employee_name": emp_name,
+			"is_trusted_principal": is_trusted_principal,
+			"is_legacy": False,
+		}
+
+	if not request.employee_id or not request.employee_id.strip():
+		raise HTTPException(
+			status_code=400,
+			detail=f"employee_id is required for role '{role}'.",
+		)
+
+	emp_id = request.employee_id.strip()
+	emp_record = _employee_by_id(emp_id)
+	if emp_record is None:
+		raise HTTPException(
+			status_code=404,
+			detail=f"Employee '{emp_id}' not found.",
+		)
+
+	if role == "Employee":
+		canonical_name = emp_record["employee_name"]
+		if request.employee_name and request.employee_name.strip().casefold() != canonical_name.casefold():
+			raise HTTPException(
+				status_code=400,
+				detail=f"Employee name '{request.employee_name}' does not match record for employee ID '{emp_id}'. Expected '{canonical_name}'.",
+			)
+		emp_name = canonical_name
+	elif role == "Manager":
+		canonical_manager = emp_record["manager_name"]
+		if canonical_manager not in DEMO_MANAGER_NAMES:
+			raise HTTPException(
+				status_code=400,
+				detail=f"Unsupported demo manager for employee ID '{emp_id}'. Allowed managers: {', '.join(sorted(DEMO_MANAGER_NAMES))}.",
+			)
+		if request.employee_name and request.employee_name.strip().casefold() != canonical_manager.casefold():
+			raise HTTPException(
+				status_code=400,
+				detail=f"Manager identity mismatch for ID '{emp_id}'. Expected '{canonical_manager}'.",
+			)
+		emp_name = canonical_manager
+	else:
+		emp_name = emp_record["employee_name"]
+
+	return {
+		"role": role,
+		"employee_id": emp_id,
+		"employee_name": emp_name,
+		"is_trusted_principal": False,
+		"is_legacy": False,
+	}
+
+
 @router.post("/ask")
-def ask(request: QuestionRequest):
-	"""Route HR policy questions to RAG or employee Agent handling."""
+def ask(
+	request: QuestionRequest,
+	principal: RoleAccessPrincipal | None = Depends(get_authenticated_role_access_principal),
+):
+	"""Route HR policy questions to RAG or employee Agent handling with demo role context."""
+	role_context = _validate_role_context(request, principal)
 	conversation_id = (request.conversation_id or "").strip()
-	history = _conversation_memory.get_history(conversation_id) if conversation_id else []
+	role_val = role_context.get("role") if role_context else None
+	emp_id_val = role_context.get("employee_id") if role_context else None
+	history = (
+		_conversation_memory.get_history(conversation_id, role=role_val, employee_id=emp_id_val)
+		if conversation_id
+		else []
+	)
 	resolved_question = resolve_employee_reference(request.question, history)
+	if role_context and role_context.get("employee_name"):
+		resolved_question = resolve_self_reference(resolved_question, role_context["employee_name"])
+
 	selected_route = route_question(resolved_question)
 	if conversation_id:
 		_logger.info(
-			"Short-term conversation context: conversation_id=%s history_turns=%d reference_resolved=%s",
+			"Short-term conversation context: conversation_id=%s history_turns=%d reference_resolved=%s role=%s",
 			conversation_id,
 			len(history) // 2,
 			resolved_question != request.question,
+			role_val,
 		)
 
 	if selected_route == "agent":
@@ -251,9 +363,15 @@ def ask(request: QuestionRequest):
 				original_question=request.question,
 				conversation_history=history,
 				prefer_mcp_tools=True,
+				role_context=role_context,
 			)
 		else:
-			agent_res = run_agent(request.question, prefer_mcp_tools=True)
+			agent_res = run_agent(
+				resolved_question,
+				original_question=request.question,
+				prefer_mcp_tools=True,
+				role_context=role_context,
+			)
 		sources = _extract_agent_sources(agent_res.get("steps", []))
 		response = {
 			"question": request.question,
@@ -262,16 +380,17 @@ def ask(request: QuestionRequest):
 			"route": "agent",
 		}
 	else:
-		response = ask_question(resolved_question)
+		response = ask_question(resolved_question, role_context=role_context)
 		response["route"] = "rag"
 		if conversation_id:
 			response["question"] = request.question
 
 	if conversation_id:
 		_conversation_memory.add_exchange(
-			conversation_id, request.question, response["answer"]
+			conversation_id, request.question, response["answer"], role=role_val, employee_id=emp_id_val
 		)
 	return response
+
 
 
 @router.get("/role-access/employees")
