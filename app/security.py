@@ -77,6 +77,158 @@ _MANAGER_QUERY = re.compile(
     r"\b(?:report(?:s|ing)?\s+to|under|team\s+of)\s+([A-Za-z][A-Za-z '-]*?)\s*[?.!]*$",
     re.IGNORECASE,
 )
+
+
+def resolve_canonical_manager_name(name: str) -> str:
+    """Resolve a manager name (partial or exact) against distinct manager names in the database."""
+    clean = name.strip()
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT manager_name FROM employees WHERE manager_name IS NOT NULL"
+            ).fetchall()
+            candidates = [r[0] for r in rows if r[0]]
+            for cand in candidates:
+                if cand.casefold() == clean.casefold():
+                    return cand
+            for cand in candidates:
+                if clean.casefold() in cand.casefold() or cand.casefold() in clean.casefold():
+                    return cand
+    except Exception:
+        pass
+    return clean
+
+
+def _extract_manager_query_name(question: str) -> str | None:
+    """Extract manager name from questions about reporting lines or direct reports."""
+    patterns = (
+        re.compile(
+            r"\b(?:reports?\s+to|reporting\s+to|team\s+of|under)\s+([A-Za-z][A-Za-z '-]*?)(?:'s\s+team|[?.!]|$|\s+department|\s+group)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b([A-Za-z][A-Za-z '-]*?)'s\s+(?:direct\s+reports?|team|reports?)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:direct\s+reports?\s+(?:of|for))\s+([A-Za-z][A-Za-z '-]*?)(?:[?.!]|$)",
+            re.IGNORECASE,
+        ),
+    )
+    for pattern in patterns:
+        m = pattern.search(question)
+        if m:
+            val = m.group(1).strip()
+            if val.casefold() in {"this manager", "the manager", "me", "this", "the policy", "policy"}:
+                continue
+            if any(term in val.casefold() for term in ("policy", "rule", "law", "guideline")):
+                continue
+            return val
+    return None
+
+
+def authorize_employee_data_access(
+    role_context: dict[str, Any] | None,
+    *,
+    target_employee_id: str | None = None,
+    target_employee_name: str | None = None,
+    target_manager_name: str | None = None,
+) -> None:
+    """Verify caller identity and authorization to access employee or manager records.
+
+    Centralized backend enforcement point shared across single-agent, multi-agent,
+    local tools, and MCP tools.
+    """
+    if role_context is None:
+        return
+
+    if role_context.get("is_legacy", False):
+        raise PermissionError(
+            "Access denied: role context is required to view employee records. Please select a demo role."
+        )
+
+    user_role = role_context.get("role")
+    user_employee_id = role_context.get("employee_id")
+    user_employee_name = role_context.get("employee_name")
+    is_trusted_principal = bool(role_context.get("is_trusted_principal", False))
+
+    if user_role == "Super Admin":
+        if is_trusted_principal:
+            return
+        import os
+        if os.getenv("ENABLE_DEMO_SUPER_ADMIN", "true").lower() in ("true", "1", "yes"):
+            return
+        raise PermissionError("Super Admin access requires a trusted authenticated identity.")
+
+    if user_role == "Employee":
+        if target_manager_name is not None:
+            raise PermissionError(
+                "Access denied: your selected role does not have permission to view this employee."
+            )
+        if target_employee_id is not None:
+            if str(target_employee_id).strip() != str(user_employee_id).strip():
+                raise PermissionError(
+                    "Access denied: your selected role does not have permission to view this employee."
+                )
+        if target_employee_name is not None:
+            db_name = None
+            if user_employee_id:
+                try:
+                    with sqlite3.connect(DATABASE_PATH) as conn:
+                        row = conn.execute(
+                            "SELECT employee_name FROM employees WHERE employee_id = ?",
+                            (str(user_employee_id).strip(),),
+                        ).fetchone()
+                        if row:
+                            db_name = row[0]
+                except Exception:
+                    pass
+            expected_name = db_name or user_employee_name
+            if not expected_name or target_employee_name.strip().casefold() != expected_name.strip().casefold():
+                raise PermissionError(
+                    "Access denied: your selected role does not have permission to view this employee."
+                )
+        return
+
+    if user_role == "Manager":
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                row = conn.execute(
+                    "SELECT manager_name FROM employees WHERE employee_id = ?",
+                    (str(user_employee_id).strip(),),
+                ).fetchone()
+                mgr_team_name = row[0] if row else user_employee_name
+                team_rows = conn.execute(
+                    "SELECT employee_id, employee_name FROM employees WHERE manager_name = ? OR manager_name = ?",
+                    (mgr_team_name, user_employee_name),
+                ).fetchall()
+                team_ids = {r[0] for r in team_rows}
+                if user_employee_id:
+                    team_ids.add(str(user_employee_id).strip())
+                team_names = {r[1].casefold() for r in team_rows}
+                if user_employee_name:
+                    team_names.add(user_employee_name.casefold())
+                if mgr_team_name:
+                    team_names.add(mgr_team_name.casefold())
+                allowed_mgr_names = {n.casefold() for n in (mgr_team_name, user_employee_name) if n}
+        except Exception as err:
+            raise PermissionError("Access denied: unable to verify manager team.") from err
+
+        if target_manager_name is not None:
+            canon_target = resolve_canonical_manager_name(target_manager_name)
+            if canon_target.casefold() not in allowed_mgr_names and target_manager_name.strip().casefold() not in allowed_mgr_names:
+                raise PermissionError("Access denied: employee is outside your authorized team.")
+
+        if target_employee_id is not None:
+            if str(target_employee_id).strip() not in team_ids:
+                raise PermissionError("Access denied: employee is outside your authorized team.")
+
+        if target_employee_name is not None:
+            if target_employee_name.strip().casefold() not in team_names:
+                raise PermissionError("Access denied: employee is outside your authorized team.")
+        return
+
+    raise PermissionError("Access denied: unsupported role.")
 _CALCULATION_RESULT_PATTERNS = {
     "carryover_days": re.compile(
         r"\b(\d+(?:\.\d+)?)\s+days?\s+(?:can\s+be\s+)?carried\s+over\b",
@@ -96,6 +248,8 @@ EMPLOYEE_FACT_TOOLS = ("get_employee_data",)
 DEPARTMENT_ROSTER_TOOLS = ("get_department_employees",)
 MANAGER_ROSTER_TOOLS = ("get_employees_by_manager",)
 POLICY_FACT_TOOLS = ("lookup_annual_leave_policy",)
+GENERAL_POLICY_TOOLS = ("lookup_policy",)
+EMPLOYEE_CREATION_TOOLS = ("get_employee_creation_requirements",)
 EMPLOYEE_POLICY_COMPARISON_TOOLS = (
     "get_employee_data",
     "lookup_annual_leave_policy",
@@ -195,7 +349,7 @@ def minimum_tools_for_question(
     question = _task_scope_question(question)
     text = question.casefold()
     base_tools: set[str] = set()
-    if re.search(r"\b(?:who|which|list|show|get)\b.*\b(?:reports? to|under|team of)\b", text):
+    if re.search(r"\b(?:who|which|list|show|get)\b.*\b(?:reports? to|reporting to|under|team of|direct reports?)\b|\bdirect reports?\b|\bworking under\b", text):
         base_tools.update(MANAGER_ROSTER_TOOLS)
     department_query = _DEPARTMENT_QUERY.search(question)
     if department_query:
@@ -211,6 +365,18 @@ def minimum_tools_for_question(
     requested_employee_fields = _requested_employee_fields(question)
     is_grade_band = "grade_band" in requested_employee_fields
 
+    is_employee_creation = bool(
+        any(term in text for term in (
+            "add an employee", "add a new employee", "create an employee",
+            "create a new employee", "adding an employee", "creating an employee",
+            "add employee", "create employee", "onboard an employee", "onboarding an employee"
+        ))
+        or (
+            any(term in text for term in ("what information", "what details", "what fields", "what data", "information required", "information needed"))
+            and any(term in text for term in ("add", "create", "new employee", "register"))
+        )
+    )
+
     is_disposition = any(
         term in text for term in ("disposition", "how should", "handled", "lapse", "lapsed")
     ) or (("carry" in text or "carried" in text) and "encash" in text) or (
@@ -219,20 +385,37 @@ def minimum_tools_for_question(
         any(term in text for term in ("carry forward", "carried forward"))
         and any(term in text for term in ("remaining", "balance", "unused"))
     )
+    is_general_policy = any(
+        term in text
+        for term in (
+            "core values", "values", "conduct", "working hours", "hours", "attendance",
+            "notice period", "notice", "probation", "work from home", "wfh", "remote",
+            "maternity", "paternity", "sick leave", "casual leave", "rules", "guidelines"
+        )
+    )
     has_policy_requirement = any(
         term in text
-        for term in ("policy", "carry", "carried", "encash", "annual leave limit", "leave limit")
-    )
+        for term in (
+            "policy", "carry", "carried", "encash", "annual leave limit", "leave limit",
+        )
+    ) or is_general_policy
 
-    if employee_specific and is_grade_band:
+    if is_employee_creation:
+        base_tools.update(EMPLOYEE_CREATION_TOOLS)
+    elif employee_specific and is_grade_band:
         base_tools.update(GRADE_BAND_TOOLS)
     elif employee_specific and is_disposition:
         base_tools.update(LEAVE_DISPOSITION_TOOLS)
     elif employee_specific and has_policy_requirement:
-        base_tools.update(EMPLOYEE_POLICY_COMPARISON_TOOLS)
+        if is_general_policy:
+            base_tools.update(EMPLOYEE_FACT_TOOLS + GENERAL_POLICY_TOOLS)
+        else:
+            base_tools.update(EMPLOYEE_POLICY_COMPARISON_TOOLS)
     elif employee_specific:
         base_tools.update(EMPLOYEE_FACT_TOOLS)
-    elif has_policy_requirement:
+    elif is_general_policy:
+        base_tools.update(GENERAL_POLICY_TOOLS)
+    elif has_policy_requirement or (not base_tools and not employee_specific):
         base_tools.update(POLICY_FACT_TOOLS)
 
     if registered_tools is not None:
@@ -302,6 +485,8 @@ def authorization_for_question(
 
     department_match = _DEPARTMENT_QUERY.search(question)
     manager_match = _MANAGER_QUERY.search(question)
+    extracted_mgr = _extract_manager_query_name(question)
+    mgr_val = extracted_mgr or (manager_match.group(1).strip() if manager_match else None)
     employee_ids = employee_ids | _database_employee_ids(employee_names)
     employee_names = employee_names | _database_employee_names(employee_ids)
 
@@ -314,7 +499,7 @@ def authorization_for_question(
         frozenset({department_match.group(1).strip()}) if department_match else None
     )
     manager_names = (
-        frozenset({manager_match.group(1).strip()}) if manager_match else None
+        frozenset({resolve_canonical_manager_name(mgr_val)}) if mgr_val else None
     )
 
     if role_context is not None:
@@ -361,12 +546,15 @@ def authorization_for_question(
                     team_names = {r[1].casefold() for r in team_rows}
                     if user_employee_name:
                         team_names.add(user_employee_name.casefold())
+                    if mgr_team_name:
+                        team_names.add(mgr_team_name.casefold())
                 employee_ids = frozenset(team_ids)
                 employee_names = frozenset(team_names)
-                manager_names = (frozenset({mgr_team_name, user_employee_name}) - {None}) or manager_names
+                manager_names = frozenset({n for n in (mgr_team_name, user_employee_name) if n})
             except Exception:
                 employee_ids = frozenset({user_employee_id}) if user_employee_id else frozenset()
                 employee_names = frozenset({user_employee_name.casefold()}) if user_employee_name else frozenset()
+                manager_names = frozenset({n for n in (user_employee_name,) if n})
     else:
         employee_ids = employee_ids or None
 
@@ -386,6 +574,9 @@ def authorization_for_question(
     allowed_employee_fields.discard("grade_band")
     if "calculate_annual_leave_disposition" in allowed_tools:
         allowed_employee_fields.update({"employee_id", "leave_balance", "jurisdiction"})
+    if "get_employee_creation_requirements" in allowed_tools:
+        from app.tools import EMPLOYEE_CREATION_SCHEMA_FIELDS
+        allowed_employee_fields.update(EMPLOYEE_CREATION_SCHEMA_FIELDS)
 
     return ToolAuthorization(
         registered_tools=registered_tools,
@@ -544,6 +735,8 @@ def validate_tool_call(
         "get_department_employees": {"department_name"},
         "get_employees_by_manager": {"manager_name"},
         "lookup_annual_leave_policy": {"jurisdiction"},
+        "lookup_policy": {"query"},
+        "get_employee_creation_requirements": set(),
         "calculate_annual_leave_disposition": {
             "leave_balance",
             "carry_over_limit",
@@ -636,9 +829,8 @@ def validate_tool_call(
                 else authorization.allowed_employee_names
             )
             is_requested_missing_value = (
-                scoped_values is not None
-                and value.casefold()
-                in {item.casefold() for item in scoped_values}
+                scoped_values is None
+                or value.casefold() in {item.casefold() for item in scoped_values}
             )
             if not is_requested_missing_value:
                 raise SecurityValidationError(
@@ -650,6 +842,8 @@ def validate_tool_call(
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{key} must be a non-empty string")
         value = value.strip()
+        if tool_name == "get_employees_by_manager":
+            value = resolve_canonical_manager_name(value)
         allowed_values = (
             authorization.allowed_department_names
             if tool_name == "get_department_employees"
@@ -675,6 +869,13 @@ def validate_tool_call(
     elif tool_name == "lookup_annual_leave_policy":
         if normalized.get("jurisdiction") != "INDIA":
             raise ValueError("jurisdiction must be INDIA")
+    elif tool_name == "lookup_policy":
+        query_val = normalized.get("query")
+        if not isinstance(query_val, str) or not query_val.strip():
+            raise ValueError("query must be a non-empty string")
+        normalized["query"] = query_val.strip()
+    elif tool_name == "get_employee_creation_requirements":
+        pass
     else:
         required = schemas[tool_name]
         if set(normalized) != required:
@@ -791,8 +992,8 @@ def validate_tool_result(
             for item in result["employees"]
         ):
             raise SecurityValidationError("Manager result contains an invalid employee")
-    elif tool_name == "lookup_annual_leave_policy":
-        if result.get("jurisdiction") != Jurisdiction.INDIA:
+    elif tool_name in {"lookup_annual_leave_policy", "lookup_policy"}:
+        if tool_name == "lookup_annual_leave_policy" and result.get("jurisdiction") != Jurisdiction.INDIA:
             raise SecurityValidationError("Policy result has unsupported jurisdiction")
         results = result.get("results")
         if not isinstance(results, list) or any(
@@ -806,6 +1007,13 @@ def validate_tool_result(
             for item in results
         ):
             raise SecurityValidationError("Policy result has an invalid results schema")
+    elif tool_name == "get_employee_creation_requirements":
+        if (
+            not isinstance(result, dict)
+            or not isinstance(result.get("required_fields"), list)
+            or not all(isinstance(f, str) for f in result["required_fields"])
+        ):
+            raise SecurityValidationError("Employee creation schema result is invalid")
     elif tool_name == "calculate_annual_leave_disposition":
         required = {"carryover_days", "encashable_days", "lapsed_days"}
         if not required.issubset(result):

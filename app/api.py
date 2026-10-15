@@ -37,6 +37,8 @@ class QuestionRequest(BaseModel):
 	role: str | None = Field(default=None, max_length=50)
 	employee_id: str | None = Field(default=None, max_length=20)
 	employee_name: str | None = Field(default=None, max_length=120)
+	agent_mode: str | None = Field(default="single", max_length=30)
+	execution_mode: str | None = Field(default=None, max_length=30)
 
 
 
@@ -233,7 +235,8 @@ def _extract_agent_sources(steps: list[dict]) -> list[dict]:
 	sources = []
 	seen = set()
 	for step in steps:
-		if step.get("tool") == "lookup_annual_leave_policy":
+		tool_name = step.get("tool")
+		if tool_name in {"lookup_annual_leave_policy", "lookup_policy", "mcp_lookup_annual_leave_policy"}:
 			obs = step.get("observation", {})
 			res = obs.get("result", {})
 			for item in res.get("results", []):
@@ -356,7 +359,24 @@ def ask(
 			role_val,
 		)
 
-	if selected_route == "agent":
+	mode = getattr(request, "execution_mode", None) or getattr(request, "agent_mode", None) or "single"
+	if mode == "multi":
+		from app.multi_agent import run_multi_agent
+		multi_res = run_multi_agent(resolved_question, role_context=role_context)
+		response = {
+			"question": request.question,
+			"answer": multi_res["answer"],
+			"sources": multi_res.get("sources", []),
+			"route": "multi_agent",
+			"agent_mode": "multi",
+			"execution_mode": "multi",
+			"status": multi_res.get("status", "success"),
+			"conversation_id": conversation_id,
+			"worker_responses": multi_res.get("worker_responses", []),
+			"metrics": multi_res.get("metrics"),
+			"steps": multi_res.get("steps", []),
+		}
+	else:
 		if conversation_id:
 			agent_res = run_agent(
 				resolved_question,
@@ -378,12 +398,12 @@ def ask(
 			"answer": agent_res["answer"],
 			"sources": sources,
 			"route": "agent",
+			"agent_mode": "single",
+			"execution_mode": "single",
+			"status": agent_res.get("status", "success"),
+			"conversation_id": conversation_id,
+			"metrics": agent_res.get("metrics", {}),
 		}
-	else:
-		response = ask_question(resolved_question, role_context=role_context)
-		response["route"] = "rag"
-		if conversation_id:
-			response["question"] = request.question
 
 	if conversation_id:
 		_conversation_memory.add_exchange(
@@ -567,3 +587,46 @@ def delete_role_access_employee(
 		connection.execute("DELETE FROM employees WHERE employee_id = ?", (employee_id,))
 		connection.commit()
 	return {"deleted_employee_id": employee_id, "message": "Employee deleted successfully."}
+
+
+@router.post("/internal/workers/policy-retrieval")
+def internal_policy_worker_endpoint(
+	request: dict[str, Any],
+	principal: RoleAccessPrincipal | None = Depends(get_authenticated_role_access_principal),
+):
+	"""Internal HTTP worker endpoint for PolicyRetrievalSpecialist (Week 10 Phase 4)."""
+	from app.multi_agent.http_transport import FAULT_INJECTION_CONFIG
+	from app.multi_agent.contracts import TaskType, WorkerRequest
+	from app.multi_agent.policy_specialist import PolicyRetrievalSpecialist
+
+	case_id = request.get("target_case_id") or request.get("context", {}).get("case_id")
+	if (
+		FAULT_INJECTION_CONFIG.get("enabled")
+		and FAULT_INJECTION_CONFIG.get("target_case_id")
+		and case_id == FAULT_INJECTION_CONFIG.get("target_case_id")
+	):
+		raise HTTPException(
+			status_code=500,
+			detail=FAULT_INJECTION_CONFIG.get("error_message", "Internal Server Error in Policy Specialist"),
+		)
+
+	task_type_str = request.get("task_type", "policy_retrieval")
+	req = WorkerRequest(
+		task_type=TaskType(task_type_str),
+		question=request.get("question", ""),
+		context=request.get("context", {}),
+		request_id=request.get("request_id"),
+		correlation_id=request.get("correlation_id"),
+	)
+	specialist = PolicyRetrievalSpecialist()
+	resp = specialist.execute(req)
+	return {
+		"request_id": resp.request_id,
+		"task_type": resp.task_type.value,
+		"status": resp.status.value,
+		"result": resp.result,
+		"evidence": resp.evidence,
+		"error": resp.error,
+		"metadata": resp.metadata,
+	}
+

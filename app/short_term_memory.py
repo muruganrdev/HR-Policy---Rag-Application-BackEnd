@@ -148,14 +148,22 @@ def resolve_employee_reference(
 
 _MY_HR_REFERENCE = re.compile(
     r"\bmy\s+((?:(?:annual|sick)\s+)?(?:leave(?:\s+balance)?|salary|pay|department|designation|role|job title|"
-    r"email|phone|work mode|employment status|employment type|manager|location|tenure|balance))\b",
+    r"email|phone|work mode|employment status|employment type|manager|location|tenure|balance|direct\s+reports?|team))\b",
     re.IGNORECASE,
+)
+_MANAGER_SELF_REFERENCE = (
+    (re.compile(r"\bunder\s+(?:this\s+manager|me)\b", re.IGNORECASE), "under {name}"),
+    (re.compile(r"\breports?\s+to\s+me\b", re.IGNORECASE), "reports to {name}"),
+    (re.compile(r"\breporting\s+to\s+me\b", re.IGNORECASE), "reporting to {name}"),
 )
 
 
 def resolve_self_reference(question: str, employee_name: str | None) -> str:
-    """Resolve first-person references like 'my salary' to the selected employee identity."""
+    """Resolve first-person and manager self-references to the selected employee identity."""
     if not employee_name or not str(employee_name).strip():
         return question
     name = str(employee_name).strip()
-    return _MY_HR_REFERENCE.sub(rf"{name}'s \1", question)
+    resolved = _MY_HR_REFERENCE.sub(rf"{name}'s \1", question)
+    for pattern, replacement in _MANAGER_SELF_REFERENCE:
+        resolved = pattern.sub(replacement.format(name=name), resolved)
+    return resolved

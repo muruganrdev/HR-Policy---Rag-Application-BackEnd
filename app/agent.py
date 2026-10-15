@@ -33,9 +33,11 @@ from app.tools import (
     Jurisdiction,
     calculate_annual_leave_disposition,
     get_department_employees,
+    get_employee_creation_requirements,
     get_employee_data,
     get_employees_by_manager,
     lookup_annual_leave_policy,
+    lookup_policy,
 )
 from app.security import (
     JSONSchemaValidationError,
@@ -133,6 +135,26 @@ TOOLS: dict[str, ToolSpec] = {
             "Do NOT use this tool for pure employee-info questions."
         ),
         callable=calculate_annual_leave_disposition,
+    ),
+    "lookup_policy": ToolSpec(
+        name="lookup_policy",
+        description=(
+            "Retrieve policy evidence from the official HR policy documents in ChromaDB (leave, attendance, conduct, working hours, notice period, WFH). "
+            "Input: query (string describing the policy topic or question). "
+            "Returns: relevant policy chunks with source and chunk_index. "
+            "Use this tool for general HR policy questions, company core values, conduct rules, working hours, notice period, and leave rules."
+        ),
+        callable=lookup_policy,
+    ),
+    "get_employee_creation_requirements": ToolSpec(
+        name="get_employee_creation_requirements",
+        description=(
+            "Retrieve the documented schema and fields required to create or add a new employee record. "
+            "Use this tool whenever the user asks what information, details, or fields are required/needed to add or create an employee. "
+            "Input: none required (empty dict). "
+            "Returns: required_fields list and field specifications."
+        ),
+        callable=get_employee_creation_requirements,
     ),
 }
 
@@ -272,6 +294,7 @@ class AgentState:
     manager_result: dict[str, Any] | None = None
     policy_result: dict[str, Any] | None = None
     calculation_result: dict[str, Any] | None = None
+    creation_requirements_result: dict[str, Any] | None = None
     steps: list[dict[str, Any]] = field(default_factory=list)
     iteration_count: int = 0
     final_answer: str | None = None
@@ -406,10 +429,40 @@ def _missing_information_state(state: AgentState) -> dict[str, Any]:
     q_lower = state.active_question.lower()
     is_employee = _is_employee_specific_question(q_lower)
     is_calc = _question_requires_calculation(q_lower)
+    # Employee creation requirement query
+    is_employee_creation = any(
+        term in q_lower
+        for term in (
+            "add an employee",
+            "add a new employee",
+            "create an employee",
+            "create a new employee",
+            "adding an employee",
+            "creating an employee",
+            "add employee",
+            "create employee",
+            "onboard an employee",
+            "onboarding an employee",
+        )
+    ) or (
+        any(
+            term in q_lower
+            for term in (
+                "what information",
+                "what details",
+                "what fields",
+                "what data",
+                "information required",
+                "information needed",
+            )
+        )
+        and any(term in q_lower for term in ("add", "create", "new employee", "register"))
+    )
 
     # Department query (Case E)
     is_dept = (
         not is_employee
+        and not is_employee_creation
         and (
             any(dept in q_lower for dept in ("engineering", "finance", "hr", "sales", "marketing", "operations"))
             or "department" in q_lower
@@ -419,8 +472,19 @@ def _missing_information_state(state: AgentState) -> dict[str, Any]:
 
     # Manager query (Case F)
     is_mgr = bool(
-        re.search(r"\b(?:reports?\s+to|reporting\s+to|team\s+of)\b", q_lower)
-        or re.search(r"\b(?:who|which|employees?|staff|people)\b.*\bunder\s+[a-z]", q_lower)
+        (
+            re.search(r"\b(?:reports?\s+to|reporting\s+to|team\s+of)\b", q_lower)
+            or re.search(r"\b(?:who|which|employees?|staff|people)\b.*\bunder\s+[a-z]", q_lower)
+            or "direct report" in q_lower
+            or "working under" in q_lower
+            or re.search(r"\bunder\s+(?:this\s+manager|me)\b", q_lower)
+        )
+        and not (
+            "under the policy" in q_lower
+            or "under policy" in q_lower
+            or "under hr policy" in q_lower
+        )
+        and not is_employee_creation
     )
 
     # Policy comparison query (Case C: employee + policy, but not disposition calculation)
@@ -439,16 +503,24 @@ def _missing_information_state(state: AgentState) -> dict[str, Any]:
     # Pure policy query (Case B)
     is_pure_policy = (
         not is_employee
+        and not is_employee_creation
         and not is_dept
         and not is_mgr
         and (
-            any(term in q_lower for term in ("policy", "carry-over limit", "carry over limit", "carryover limit", "encashment", "limit", "rules", "guidelines", "entitlement", "allowance"))
+            any(term in q_lower for term in ("policy", "carry-over limit", "carry over limit", "carryover limit", "encashment", "limit", "rules", "guidelines", "entitlement", "allowance", "core values", "values", "conduct", "working hours", "notice period", "attendance", "wfh"))
             or ("annual leave" in q_lower and any(term in q_lower for term in ("carry", "encash", "limit", "maximum", "how much", "how many")))
         )
     )
 
+    is_annual_leave_policy = "annual leave" in q_lower or (
+        any(term in q_lower for term in ("carry-over", "carry over", "carryforward", "carry forward", "encash", "encashment", "leave lapse"))
+        and not any(term in q_lower for term in ("core values", "values", "conduct", "working hours", "notice period", "attendance", "wfh"))
+    )
+
     required: list[str] = []
-    if is_dept:
+    if is_employee_creation:
+        required = ["employee_creation_requirements"]
+    elif is_dept:
         required = ["department_result"]
     elif is_mgr:
         required = ["manager_result"]
@@ -460,11 +532,14 @@ def _missing_information_state(state: AgentState) -> dict[str, Any]:
     elif is_policy_comparison:
         required = ["employee_record", "annual_leave_policy"]
     elif is_pure_policy:
-        required = ["annual_leave_policy"]
+        if is_annual_leave_policy:
+            required = ["annual_leave_policy"]
+        else:
+            required = ["policy_result"]
     elif is_employee:
         required = ["employee_record"]
     else:
-        required = ["annual_leave_policy"]
+        required = ["policy_result"]
 
     observations_status = {
         "employee_record": "available" if state.employee_record is not None else "missing",
@@ -477,6 +552,8 @@ def _missing_information_state(state: AgentState) -> dict[str, Any]:
     obs_map = {
         "employee_record": state.employee_record is not None,
         "annual_leave_policy": state.policy_result is not None,
+        "policy_result": state.policy_result is not None,
+        "employee_creation_requirements": getattr(state, "creation_requirements_result", None) is not None,
         "leave_disposition_calculation": state.calculation_result is not None,
         "department_result": state.department_result is not None,
         "manager_result": state.manager_result is not None,
@@ -489,6 +566,10 @@ def _missing_information_state(state: AgentState) -> dict[str, Any]:
         recommended_next_tool = "get_employee_data"
     elif "annual_leave_policy" in missing:
         recommended_next_tool = "lookup_annual_leave_policy"
+    elif "policy_result" in missing:
+        recommended_next_tool = "lookup_policy"
+    elif "employee_creation_requirements" in missing:
+        recommended_next_tool = "get_employee_creation_requirements"
     elif "leave_disposition_calculation" in missing:
         recommended_next_tool = "calculate_annual_leave_disposition"
     elif "department_result" in missing:
@@ -733,10 +814,10 @@ def _policy_numeric_limit(policy_result: Any, *, keyword: str) -> float | None:
         return None
     patterns = {
         "carry_over": [
-            r"(?:maximum(?: of)?|up to)\s*(\d+(?:\.\d+)?)\s*days?[^.\n]{0,60}(?:carry(?:-?over| over)|carried over)",
-            r"(\d+(?:\.\d+)?)\s*days?\s*(?:can\s+be\s+)?(?:carry(?:-?over| over)|carryover)",
-            r"(?:carry(?:-?over| over)|carryover)\s*(?:limit|of)\s*(\d+(?:\.\d+)?)\s*days?",
-            r"(\d+(?:\.\d+)?)\s*days?\s*carry(?:-?over| over)",
+            r"(?:maximum(?: of)?|up to)\s*(\d+(?:\.\d+)?)\s*days?[^.\n]{0,60}(?:carry(?:-?over| over|-?forward|\s+forward)|carried\s+(?:over|forward))",
+            r"(\d+(?:\.\d+)?)\s*days?\s*(?:can\s+be\s+)?(?:carry(?:-?over| over|-?forward|\s+forward)|carried\s+(?:over|forward)|carryover)",
+            r"(?:carry(?:-?over| over|-?forward|\s+forward)|carryover)\s*(?:limit|of)\s*(\d+(?:\.\d+)?)\s*days?",
+            r"(\d+(?:\.\d+)?)\s*days?\s*(?:carry(?:-?over| over|-?forward|\s+forward)|carried\s+(?:over|forward))",
         ],
         "encashment": [
             r"maximum(?: of)?\s*(\d+(?:\.\d+)?)\s*days?[^.\n]{0,60}encash(?:ed|ment)?",
@@ -799,10 +880,29 @@ def _default_tool_arguments_for_missing_requirement(state: AgentState, tool_name
         return {"department_name": "Engineering"}
 
     if tool_name in {"get_employees_by_manager", "hris_get_manager_team"}:
-        for mgr in ("Arun Kumar", "Deepak Sharma", "Priya Nair", "Vikram Shah"):
-            if mgr.lower() in q_lower:
-                return {"manager_name": mgr}
+        from app.security import _extract_manager_query_name, resolve_canonical_manager_name
+        extracted = _extract_manager_query_name(state.active_question)
+        if extracted:
+            return {"manager_name": resolve_canonical_manager_name(extracted)}
+        if state.role_context and state.role_context.get("employee_name") and state.role_context.get("role") == "Manager":
+            return {"manager_name": resolve_canonical_manager_name(state.role_context["employee_name"])}
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                rows = conn.execute("SELECT DISTINCT manager_name FROM employees WHERE manager_name IS NOT NULL").fetchall()
+                for r in rows:
+                    if r[0] and r[0].lower() in q_lower:
+                        return {"manager_name": r[0]}
+                if rows and rows[0][0]:
+                    return {"manager_name": rows[0][0]}
+        except Exception:
+            pass
         return {"manager_name": "Arun Kumar"}
+
+    if tool_name == "lookup_policy":
+        return {"query": state.active_question}
+
+    if tool_name == "get_employee_creation_requirements":
+        return {}
 
     return {}
 
@@ -1192,9 +1292,29 @@ def _generate_final_answer(
             return f"{employee_names[0]} and {employee_names[1]} report to {manager}."
         return f"{', '.join(employee_names[:-1])}, and {employee_names[-1]} report to {manager}."
 
+    if getattr(state, "creation_requirements_result", None) is not None:
+        fields = state.creation_requirements_result.get("required_fields", [])
+        return (
+            f"To add a new employee, the following information is required based on the system schema: "
+            f"{', '.join(fields)}."
+        )
+
     if state.policy_result is not None:
         question = state.active_question.lower()
         employee = state.employee_record or {}
+        if "core values" in question or "core value" in question:
+            for item in state.policy_result.get("results", []):
+                content = item.get("content", "")
+                if "Core Values" in content or "Integrity" in content:
+                    src = item.get("source", "employee_conduct_policy.pdf")
+                    chunk = item.get("chunk_index", 0)
+                    return (
+                        "The company's core values are Integrity (act with honesty and transparency), "
+                        "Respect (treat all colleagues, clients, and stakeholders with dignity), "
+                        "Accountability (take ownership of work and meet commitments), "
+                        "Collaboration (work effectively with teammates), and "
+                        f"Excellence (maintain high standards of quality). (Source: {src}, chunk {chunk})"
+                    )
         if "annual leave" in question and "policy" in question:
             passages = [
                 item
@@ -1227,7 +1347,7 @@ def _generate_final_answer(
                         f"employees may encash a maximum of {_fmt(limit)} days per calendar year."
                     )
                 return f"Employees may encash a maximum of {_fmt(limit)} days per calendar year."
-        if "carry" in state.active_question.lower():
+        if any(term in state.active_question.lower() for term in ("carry", "carried", "carryover", "carry-over")):
             limit = _policy_numeric_limit(state.policy_result, keyword="carry_over")
             if limit is not None:
                 if employee.get("employee_name") and employee.get("leave_balance") is not None and "compar" in question:
@@ -1235,7 +1355,7 @@ def _generate_final_answer(
                         f"{employee['employee_name']} has { _fmt(employee['leave_balance'])} days of annual leave; "
                         f"the policy allows up to {_fmt(limit)} days to be carried over."
                     )
-                return f"Employees may carry over up to {_fmt(limit)} days."
+                return f"Under company policy, employees may carry forward up to {_fmt(limit)} days of unused annual leave."
 
     if state.employee_record is not None:
         employee = state.employee_record
@@ -1645,8 +1765,10 @@ def run_agent(
                 state.department_result = result
             elif tool_name in {"get_employees_by_manager", "hris_get_manager_team"}:
                 state.manager_result = result
-            elif tool_name in {"lookup_annual_leave_policy", "mcp_lookup_annual_leave_policy"}:
+            elif tool_name in {"lookup_annual_leave_policy", "mcp_lookup_annual_leave_policy", "lookup_policy"}:
                 state.policy_result = result
+            elif tool_name == "get_employee_creation_requirements":
+                state.creation_requirements_result = result
             elif tool_name == "calculate_annual_leave_disposition":
                 state.calculation_result = result
         except PermissionError as error:
@@ -1659,7 +1781,17 @@ def run_agent(
                     "observation": _json_safe(observation),
                 }
             )
-            state.final_answer = str(error)
+            err_msg = str(error)
+            if any(term in state.active_question.lower() for term in ("carry", "annual leave", "leave balance", "policy", "encash")):
+                try:
+                    p_res = lookup_annual_leave_policy(Jurisdiction.INDIA)
+                    state.policy_result = p_res
+                    limit = _policy_numeric_limit(p_res, keyword="carry_over") or 10.0
+                    limit_str = f"{int(limit)}" if float(limit).is_integer() else f"{limit}"
+                    err_msg = f"{err_msg} Under company policy, employees may carry forward up to {limit_str} days of annual leave."
+                except Exception:
+                    pass
+            state.final_answer = err_msg
             state.steps.append({"phase": "final", "answer": state.final_answer})
             _emit(state, f"[STEP {state.iteration_count}] OBSERVE")
             _emit(

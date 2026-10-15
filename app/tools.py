@@ -68,6 +68,8 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
 def get_employee_data(
     employee_id: str | None = None,
     employee_name: str | None = None,
+    *,
+    role_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Retrieve a single employee record by ID or by name.
 
@@ -78,6 +80,7 @@ def get_employee_data(
         ValueError           – if neither identifier is supplied.
         EmployeeNotFoundError – if no record matches the identifier.
         AmbiguousEmployeeError – if multiple records match the name.
+        PermissionError      – if role_context is unauthorized for the target record.
     """
     has_id = employee_id is not None and str(employee_id).strip()
     has_name = employee_name is not None and str(employee_name).strip()
@@ -85,6 +88,14 @@ def get_employee_data(
     if not has_id and not has_name:
         raise ValueError(
             "Provide at least one of employee_id or employee_name."
+        )
+
+    if role_context is not None:
+        from app.security import authorize_employee_data_access
+        authorize_employee_data_access(
+            role_context,
+            target_employee_id=str(employee_id).strip() if has_id else None,
+            target_employee_name=str(employee_name).strip() if has_name else None,
         )
 
     with sqlite3.connect(DATABASE_PATH) as connection:
@@ -113,10 +124,10 @@ def get_employee_data(
         rows = connection.execute(
             """
             SELECT employee_id, employee_name, email, phone,
-                   department, designation, employment_type, employment_status,
-                   date_of_joining, tenure_years, manager_name, location,
-                   jurisdiction, leave_balance, sick_leave_balance,
-                   annual_salary, work_mode
+                    department, designation, employment_type, employment_status,
+                    date_of_joining, tenure_years, manager_name, location,
+                    jurisdiction, leave_balance, sick_leave_balance,
+                    annual_salary, work_mode
             FROM employees
             WHERE LOWER(employee_name) = LOWER(?)
             """,
@@ -166,7 +177,11 @@ def get_department_employees(department_name: str) -> dict[str, Any]:
     }
 
 # Tool - 3
-def get_employees_by_manager(manager_name: str) -> dict[str, Any]:
+def get_employees_by_manager(
+    manager_name: str,
+    *,
+    role_context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Return employees whose manager_name matches the supplied name.
 
     Input:  ``manager_name`` — manager's full name (case-insensitive).
@@ -174,6 +189,12 @@ def get_employees_by_manager(manager_name: str) -> dict[str, Any]:
     """
     if not manager_name or not str(manager_name).strip():
         raise ValueError("manager_name must be a non-empty string.")
+
+    from app.security import authorize_employee_data_access, resolve_canonical_manager_name
+
+    canonical_mgr = resolve_canonical_manager_name(str(manager_name).strip())
+    if role_context is not None:
+        authorize_employee_data_access(role_context, target_manager_name=canonical_mgr)
 
     with sqlite3.connect(DATABASE_PATH) as connection:
         connection.row_factory = sqlite3.Row
@@ -184,12 +205,12 @@ def get_employees_by_manager(manager_name: str) -> dict[str, Any]:
             WHERE LOWER(manager_name) = LOWER(?)
             ORDER BY employee_id
             """,
-            (str(manager_name).strip(),),
+            (canonical_mgr,),
         ).fetchall()
 
     employees = [dict(r) for r in rows]
     return {
-        "manager_name": manager_name,
+        "manager_name": canonical_mgr,
         "count": len(employees),
         "employees": employees,
     }
@@ -246,3 +267,70 @@ def calculate_annual_leave_disposition(
         "encashable_days": min(leave_balance, encashment_limit),
         "lapsed_days": max(leave_balance - carry_over_limit, 0.0),
     }
+
+
+# Tool - 6
+def lookup_policy(
+    query: str,
+    jurisdiction: Jurisdiction | str = Jurisdiction.INDIA,
+) -> dict[str, Any]:
+    """Retrieve policy evidence from official HR policy documents in ChromaDB.
+
+    Input:  ``query`` — natural language topic or question.
+    Output: list of relevant document chunks with content, source, and chunk_index.
+    """
+    if not query or not str(query).strip():
+        raise ValueError("query must be a non-empty string.")
+
+    from app.search import search
+
+    results = search(str(query).strip())
+    return {
+        "query": str(query).strip(),
+        "policy_area": "general_policy",
+        "results": results,
+    }
+
+
+# ===========================================================================
+# SCHEMA / METADATA TOOLS
+# ===========================================================================
+
+EMPLOYEE_CREATION_SCHEMA_FIELDS = [
+    "employee_id",
+    "employee_name",
+    "email",
+    "phone",
+    "department",
+    "designation",
+    "employment_type",
+    "employment_status",
+    "date_of_joining",
+    "tenure_years",
+    "manager_name",
+    "location",
+    "jurisdiction",
+    "leave_balance",
+    "sick_leave_balance",
+    "annual_salary",
+    "work_mode",
+]
+
+
+# Tool - 7
+def get_employee_creation_requirements() -> dict[str, Any]:
+    """Return the documented schema fields required to create a new employee.
+
+    Source: EmployeeCreateRequest schema from app.api.
+    Returns: list of required fields and system rules.
+    Does NOT require employee database access, private data, or LLM generation.
+    """
+    return {
+        "description": "Documented fields required to add an employee record based on the EmployeeCreateRequest schema.",
+        "required_fields": list(EMPLOYEE_CREATION_SCHEMA_FIELDS),
+        "system_rules": [
+            "Super Admin access is required to create new employee records.",
+            "All fields must adhere to the EmployeeCreateRequest type and range constraints.",
+        ],
+    }
+

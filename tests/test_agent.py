@@ -852,5 +852,7 @@ def test_tool_registry_contains_all_expected_tools():
         "get_employees_by_manager",
         "lookup_annual_leave_policy",
         "calculate_annual_leave_disposition",
+        "lookup_policy",
+        "get_employee_creation_requirements",
     }
     assert set(agent.TOOLS.keys()) == expected
