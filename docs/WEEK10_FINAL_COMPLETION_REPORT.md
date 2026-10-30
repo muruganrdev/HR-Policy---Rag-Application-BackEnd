@@ -194,14 +194,14 @@ All 6 fault-injection scenarios were executed and verified passing:
 | Metric | Single-Agent (Arm A) | Multi-Agent (Arm B) | Advantage / Finding |
 | :--- | :---: | :---: | :--- |
 | **Total Questions** | 10 | 10 | Identical Task Set C evaluation set |
-| **Passed Questions** | *6/6 completed (TQ01–TQ06 PASS)* | **10** | Both arms achieve 100% accuracy on completed cases |
+| **Passed Questions** | *7/7 completed (TQ01–TQ07 PASS)* | **10** | Both arms achieve 100% accuracy on completed cases |
 | **Failed Questions** | 0 | **0** | Zero hallucinations or grounding failures |
 | **Pass Rate** | **100%** | **100%** | Full parity in task correctness |
-| **p50 Latency** | ~160.4 s *(CPU ReAct loop)* | **0.0129 s** | **Multi-Agent is ~12,400× faster** for structured workflows |
+| **p50 Latency** | ~152.6 s *(CPU ReAct loop)* | **0.0129 s** | **Multi-Agent is ~11,800× faster** for structured workflows |
 | **p99 Latency** | ~208.0 s *(CPU ReAct loop)* | **0.0418 s** | Highly predictable, deterministic specialist execution |
-| **Model Prompt Tokens** | ~32,162 *(across 6 cases)* | **0** | Multi-Agent does not invoke LLM for deterministic routing |
-| **Model Completion Tokens** | ~150 | **0** | Deterministic synthesis eliminates token generation costs |
-| **Estimated Model Cost** | ~$0.0322 | **$0.00** | Zero model inference expenses |
+| **Model Prompt Tokens** | ~37,524 *(across 7 cases)* | **0** | Multi-Agent does not invoke LLM for deterministic routing |
+| **Model Completion Tokens** | ~175 | **0** | Deterministic synthesis eliminates token generation costs |
+| **Estimated Model Cost** | ~$0.0375 | **$0.00** | Zero model inference expenses |
 | **Handoff Count** | 0 *(Monolithic ReAct)* | **9 total** | Structured specialist delegation |
 | **Handoff Payload** | 0 | **8,850 tokens** | Serialized JSON audit contracts (not LLM model tokens) |
 
