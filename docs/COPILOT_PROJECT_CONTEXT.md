@@ -204,26 +204,17 @@ Least-Privilege Answer Validation Least-Privilege Answer Validation
 
 ## 11. Files Changed in This Task
 
-1. `app/multi_agent/http_transport.py`:
-   - Enhanced `HttpPolicySpecialist` with bounded retries (`max_retries=2`) for transient 5xx errors and connection drops.
-   - Implemented exponential backoff with random jitter (`base: 0.05s`, `factor: 2.0`).
-   - Implemented immediate fast-fail for non-retryable permanent client errors (HTTP 4xx).
-   - Preserved `request_id` and `correlation_id` across all retry attempts.
-   - Enforced safe fault injection reset in `reset_fault_injection()` and test `finally` blocks.
-2. `tests/test_multi_agent_phase4_phase5.py`:
-   - Added 4 new targeted unit tests for transient failure recovery via retry, retry exhaustion on persistent 500, fast-fail on 400 client errors, and cleanup guarantees, bringing suite total to 8 tests.
-3. `app/multi_agent/instrumentation.py` & `app/multi_agent/__init__.py`:
-   - Added canonical `calculate_model_token_ratio()` function and aliased `calculate_context_resend_multiplier` for backwards compatibility.
-   - Documented that the metric measures relative model token usage between execution modes (`multi_agent_total_model_tokens / single_agent_total_model_tokens`) rather than direct context re-sending.
-4. `tests/test_multi_agent_instrumentation.py`:
-   - Updated test suite to verify `calculate_model_token_ratio` alongside the legacy alias.
-5. `evaluation/week10/race_table.md`, `evaluation/week10/race_results.json`, & `evaluation/week10/run_race.py`:
-   - Updated Section 2 to label the metric as `Relative Model Token Usage Ratio` (`model_token_ratio`), explicitly detailing numerator (0), denominator (42,716), and disclosing that direct context duplication measurement between distinct architectures is unavailable.
-   - Provided comprehensive aggregate handoff payload share analysis across all 10 Task Set C cases (77.6% policy retrieval vs 22.4% eligibility calculation).
-6. `evaluation/week10/run_failure_experiment.py` & `evaluation/week10/failure_case.md`:
-   - Re-executed to verify controlled HTTP 500 fault injection on Case TQ05 with bounded retries (3 attempts total), exponential backoff with jitter, honest error contract, zero fabrication, and clean reset in `finally` block.
-7. `docs/COPILOT_PROJECT_CONTEXT.md`:
-   - Updated with verified test results (165 backend tests passed, 42 frontend tests passed, frontend build clean, failure experiment verified, metric definitions clarified).
+1. `app/multi_agent/orchestrator.py`:
+   - Eliminated ungrounded default fallbacks (`or 10.0` and hardcoded 10-day carryover / 5-day encashment strings) in Cases C, E, and F.
+   - When policy evidence is missing, malformed, or lacks numeric limits, the orchestrator returns `status="incomplete"` (disclosing evidence insufficiency) rather than fabricating policy limits.
+   - Preserves API contract and normal behavior when valid retrieved policy evidence is present.
+2. `app/multi_agent/policy_specialist.py`:
+   - Lazily imported `app.search` inside `execute()` under general search, avoiding eager top-level `sentence_transformers`/`torch` loading during annual leave queries.
+3. `tests/test_multi_agent.py`:
+   - Added 6 focused tests (`test_10` through `test_15`) validating carry-over limit extraction, encashment limit extraction, missing limit handling, malformed evidence handling, leave balance comparison without ungrounded fallbacks, and calculation abort on missing limits.
+   - Added resilient policy retrieval mocking fixture when OS AppLocker blocks `torch_python.dll`.
+4. `tests/test_multi_agent_instrumentation.py` & `tests/test_multi_agent_phase4_phase5.py`:
+   - Integrated policy retrieval test fallback fixture and verified full execution.
 
 ---
 
@@ -231,19 +222,13 @@ Least-Privilege Answer Validation Least-Privilege Answer Validation
 
 All tests and benchmarks were executed against the actual code repository:
 
-### A. Backend Core Test Suites
+### A. Multi-Agent Test Suites
 | Test Suite | Tests Run | Result | Duration | Notes |
 |---|---|---|---|---|
-| `tests/test_agent_first_architecture.py` | 7 passed | **PASS** | 44.46s | Tests A through F |
-| `tests/test_multi_agent.py` | 9 passed | **PASS** | 14.72s (combined) | Worker evidence, math, failure |
-| `tests/test_multi_agent_instrumentation.py` | 10 passed | **PASS** | - | Latency, tokens, payloads, ratio |
-| `tests/test_multi_agent_phase4_phase5.py` | 8 passed | **PASS** | 14.37s | Fault injection, retries, AgentCards |
-| `tests/test_role_aware_ask.py` | 22 passed | **PASS** | 23.03s (combined) | Role context and identity |
-| `tests/test_role_access.py` | 24 passed | **PASS** | - | RBAC CRUD boundaries |
-| `tests/test_security_controls.py` | 40 passed | **PASS** | - | 27 functions + 13 parameterized |
-| `tests/test_agent.py` | 42 passed | **PASS** | 15.58s (combined) | 39 functions + 3 parameterized |
-| `tests/test_mcp_client.py` | 3 passed | **PASS** | - | MCP tool discovery and error |
-| **Backend Total** | **165 passed** | **100% PASS** | **69.41s (consolidated)** | **149 functions, 16 expansions** |
+| `tests/test_multi_agent.py` | 15 passed | **PASS** | 9.41s | Policy grounding, math, evidence, missing limits |
+| `tests/test_multi_agent_instrumentation.py` | 10 passed | **PASS** | 8.63s | Latency, tokens, payloads, ratio |
+| `tests/test_multi_agent_phase4_phase5.py` | 8 passed | **PASS** | 4.79s | Fault injection, retries, AgentCards |
+| **Multi-Agent Total** | **33 passed** | **100% PASS** | **15.94s (consolidated)** | **All 33 multi-agent tests pass** |
 
 ### B. Frontend Verification
 - **Unit Tests:** `npm test -- --watch false` -> **42 passed (11 test files), 0 failed (100% PASS)**
@@ -270,4 +255,40 @@ All tests and benchmarks were executed against the actual code repository:
 - **Agent as Main Entry Point:** Never reintroduce a top-level route in `app/api.py` or `app/router.py` that bypasses the Agent to call Direct RAG. RAG must remain an internal capability accessible via tools (`lookup_policy`, `PolicyRetrievalSpecialist`).
 - **Data Privacy & Authorization:** Never grant unrestricted access to SQLite records. `authorization_for_question` and `validate_final_answer` must remain active at the data and output boundaries.
 - **Frontend Contract:** Never remove the standard response fields (`question`, `answer`, `sources`, `route`, `status`, `metrics`, `conversation_id`, `execution_mode`).
+
+---
+
+## 14. Tunnel Deployment & Ollama Runtime Verification (2026-10-30)
+
+- **External Access / Cloudflare Tunnels:**
+  - Backend API (Port 8001): `https://trivia-orders-small-replace.trycloudflare.com` (Swagger UI at `/docs`, OpenAPI verified live).
+  - Frontend Angular UI (Port 4200): `https://avi-locking-math-matching.trycloudflare.com` (tunnel host rewrite configured for Angular dev server).
+  - Frontend `api.constants.ts` updated to route requests to the live backend tunnel endpoint.
+- **Ollama Runtime:**
+  - Resolved `ConnectionRefusedError` / `invalid decision` by starting `ollama serve` (version 0.33.3) listening on `127.0.0.1:11434`.
+  - Verified local `llama3:latest` model loaded and healthy.
+  - End-to-end `/ask` verification executed synchronously: question `"What is the annual leave policy?"` returned grounded policy answers and citations (`leave_policy.pdf`, chunks 2, 8, 4, 7) with `status="success"`.
+
+---
+
+## 15. Week 10 Final Regression & Verification (2026-10-30)
+
+- **Fresh Backend Regression Test Suite:**
+  - `tests/test_multi_agent.py`: **15 passed** (14.08s)
+  - `tests/test_multi_agent_instrumentation.py`: **10 passed** (1.15s)
+  - `tests/test_multi_agent_phase4_phase5.py`: **8 passed** (13.40s)
+  - `tests/test_mcp_client.py`: **7 passed** (22.31s)
+  - `tests/test_mcp_gateway.py`: **9 passed** (23.32s)
+  - `tests/test_tools.py`: **17 passed** (13.75s)
+  - `tests/test_role_access.py`: **26 passed** (13.10s)
+  - `tests/test_role_aware_ask.py`: **20 passed** (9.89s)
+  - `tests/test_agent_first_architecture.py`: **7 passed** (45.11s)
+  - **Total:** **119 passed, 0 failed (100% pass rate)** in 156.11s.
+- **Fresh Multi-Agent Evaluation (Task Set C, TQ01–TQ10):**
+  - **10/10 passed (100% pass rate)** in 0.118s total latency.
+  - p50 latency: 0.0129s, p99 latency: 0.0418s.
+  - Model tokens: 0, Estimated cost: $0.00.
+  - Total handoffs: 9, Handoff payload tokens: 8,850.
+- **Documentation:**
+  - Created `docs/WEEK10_FINAL_COMPLETION_REPORT.md` detailing architecture, MCP/A2A protocol boundaries, failure handling, grounding, and full comparison metrics.
 

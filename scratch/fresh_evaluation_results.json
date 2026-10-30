@@ -1,0 +1,296 @@
+{
+  "timestamp": "2026-10-30T15:28:08.578303+00:00",
+  "multi_agent": [
+    {
+      "id": "TQ01",
+      "question": "What is Neha Iyer's annual salary?",
+      "answer": "Neha Iyer's annual salary is \u20b9840,000.",
+      "expected_contains": [
+        "Neha Iyer",
+        "840,000"
+      ],
+      "passed": true,
+      "latency": 0.0015,
+      "tokens": 0,
+      "handoff_payload_tokens": 0,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 0,
+      "handoff_count": 0
+    },
+    {
+      "id": "TQ02",
+      "question": "What is Rahul Das's annual leave balance?",
+      "answer": "Rahul Das's annual leave balance is 5 days.",
+      "expected_contains": [
+        "Rahul Das",
+        "5"
+      ],
+      "passed": true,
+      "latency": 0.0006,
+      "tokens": 0,
+      "handoff_payload_tokens": 0,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 0,
+      "handoff_count": 0
+    },
+    {
+      "id": "TQ03",
+      "question": "Which employees work in Engineering?",
+      "answer": "The employees working in Engineering are: Neha Iyer, Arjun Menon.",
+      "expected_contains": [
+        "Neha Iyer",
+        "Arjun Menon"
+      ],
+      "passed": true,
+      "latency": 0.0006,
+      "tokens": 0,
+      "handoff_payload_tokens": 0,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 0,
+      "handoff_count": 0
+    },
+    {
+      "id": "TQ04",
+      "question": "Which employees report to Arun Kumar?",
+      "answer": "The employees reporting to Arun Kumar are: Neha Iyer, Arjun Menon.",
+      "expected_contains": [
+        "Neha Iyer",
+        "Arjun Menon"
+      ],
+      "passed": true,
+      "latency": 0.003,
+      "tokens": 0,
+      "handoff_payload_tokens": 0,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 0,
+      "handoff_count": 0
+    },
+    {
+      "id": "TQ05",
+      "question": "What is the annual leave carry-over limit under the policy?",
+      "answer": "Under the policy, the annual leave carry-over limit is 10 days.",
+      "expected_contains": [
+        "10 days"
+      ],
+      "passed": true,
+      "latency": 0.0418,
+      "tokens": 0,
+      "handoff_payload_tokens": 1143,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 1,
+      "handoff_count": 1
+    },
+    {
+      "id": "TQ06",
+      "question": "What is the maximum annual leave encashment allowed by policy?",
+      "answer": "Under the policy, the maximum annual leave encashment allowed is 5 days.",
+      "expected_contains": [
+        "5 days"
+      ],
+      "passed": true,
+      "latency": 0.0119,
+      "tokens": 0,
+      "handoff_payload_tokens": 1144,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 1,
+      "handoff_count": 1
+    },
+    {
+      "id": "TQ07",
+      "question": "Compare Priya Nair's annual leave balance with the annual leave carry-over limit.",
+      "answer": "Priya Nair has an annual leave balance of 20 days, compared to the policy carry-over limit of 10 days.",
+      "expected_contains": [
+        "Priya Nair",
+        "20",
+        "10"
+      ],
+      "passed": true,
+      "latency": 0.0138,
+      "tokens": 0,
+      "handoff_payload_tokens": 1148,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 1,
+      "handoff_count": 1
+    },
+    {
+      "id": "TQ08",
+      "question": "For employee 005, give the full annual leave disposition.",
+      "answer": "For employee 005, 10 days can be carried over, 5 days can be encashed, and 10 days lapse.",
+      "expected_contains": [
+        "10 days can be carried over",
+        "5 days can be encashed",
+        "10 days lapse"
+      ],
+      "passed": true,
+      "latency": 0.0156,
+      "tokens": 0,
+      "handoff_payload_tokens": 1799,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 2,
+      "handoff_count": 2
+    },
+    {
+      "id": "TQ09",
+      "question": "For employee 006, report the annual leave carry-over, encashment, and lapse amounts.",
+      "answer": "For employee 006, 5 days can be carried over, 5 days can be encashed, and 0 days lapse.",
+      "expected_contains": [
+        "5 days can be carried over",
+        "5 days can be encashed",
+        "0 days lapse"
+      ],
+      "passed": true,
+      "latency": 0.0145,
+      "tokens": 0,
+      "handoff_payload_tokens": 1812,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 2,
+      "handoff_count": 2
+    },
+    {
+      "id": "TQ10",
+      "question": "For employee 004, what portion of the annual leave balance lapses?",
+      "answer": "For employee 004, 2 days lapse.",
+      "expected_contains": [
+        "2 days lapse"
+      ],
+      "passed": true,
+      "latency": 0.0145,
+      "tokens": 0,
+      "handoff_payload_tokens": 1804,
+      "cost": 0.0,
+      "error": null,
+      "specialist_call_count": 2,
+      "handoff_count": 2
+    }
+  ],
+  "single_agent": [
+    {
+      "id": "TQ01",
+      "question": "What is Neha Iyer's annual salary?",
+      "answer": "Neha Iyer's annual salary is 840,000.",
+      "expected_contains": [
+        "Neha Iyer",
+        "840,000"
+      ],
+      "passed": true,
+      "latency": 208.0101,
+      "tokens": 5447,
+      "cost": 0.005447,
+      "error": null,
+      "tools_used": [
+        "hris_get_employee_snapshot"
+      ]
+    },
+    {
+      "id": "TQ02",
+      "question": "What is Rahul Das's annual leave balance?",
+      "answer": "Rahul Das's annual leave balance is 5.0.",
+      "expected_contains": [
+        "Rahul Das",
+        "5"
+      ],
+      "passed": true,
+      "latency": 175.4352,
+      "tokens": 5437,
+      "cost": 0.005437,
+      "error": null,
+      "tools_used": [
+        "hris_get_employee_leave_balance"
+      ]
+    },
+    {
+      "id": "TQ03",
+      "question": "Which employees work in Engineering?",
+      "answer": "Neha Iyer and Arjun Menon work in Engineering.",
+      "expected_contains": [
+        "Neha Iyer",
+        "Arjun Menon"
+      ],
+      "passed": true,
+      "latency": 139.5822,
+      "tokens": 5270,
+      "cost": 0.00527,
+      "error": null,
+      "tools_used": [
+        "hris_get_department_roster"
+      ]
+    },
+    {
+      "id": "TQ04",
+      "question": "Which employees report to Arun Kumar?",
+      "answer": "Neha Iyer and Arjun Menon report to Arun Kumar.",
+      "expected_contains": [
+        "Neha Iyer",
+        "Arjun Menon"
+      ],
+      "passed": true,
+      "latency": 147.718,
+      "tokens": 5295,
+      "cost": 0.005295,
+      "error": null,
+      "tools_used": [
+        "hris_get_manager_team"
+      ]
+    },
+    {
+      "id": "TQ05",
+      "question": "What is the annual leave carry-over limit under the policy?",
+      "answer": "India's annual leave policy allows up to 10 days to be carried over and up to 5 days to be encashed per calendar year. Unused balance above the carry-over limit lapses. (Source: leave_policy.pdf, chunk 2)",
+      "expected_contains": [
+        "10 days"
+      ],
+      "passed": true,
+      "latency": 168.178,
+      "tokens": 5349,
+      "cost": 0.005349,
+      "error": null,
+      "tools_used": [
+        "mcp_lookup_annual_leave_policy"
+      ]
+    },
+    {
+      "id": "TQ06",
+      "question": "What is the maximum annual leave encashment allowed by policy?",
+      "answer": "India's annual leave policy allows up to 10 days to be carried over and up to 5 days to be encashed per calendar year. Unused balance above the carry-over limit lapses. (Source: leave_policy.pdf, chunk 2)",
+      "expected_contains": [
+        "5 days"
+      ],
+      "passed": true,
+      "latency": 152.5589,
+      "tokens": 5364,
+      "cost": 0.005364,
+      "error": null,
+      "tools_used": [
+        "mcp_lookup_annual_leave_policy"
+      ]
+    },
+    {
+      "id": "TQ07",
+      "question": "Compare Priya Nair's annual leave balance with the annual leave carry-over limit.",
+      "answer": "Priya Nair has 20 days of annual leave; the policy allows up to 10 days to be carried over.",
+      "expected_contains": [
+        "Priya Nair",
+        "20",
+        "10"
+      ],
+      "passed": true,
+      "latency": 133.7775,
+      "tokens": 5362,
+      "cost": 0.005362,
+      "error": null,
+      "tools_used": [
+        "hris_get_employee_leave_balance",
+        "mcp_lookup_annual_leave_policy"
+      ]
+    }
+  ]
+}

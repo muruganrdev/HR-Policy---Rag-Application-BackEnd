@@ -12,7 +12,6 @@ from typing import Any
 
 from app.multi_agent.contracts import TaskType, WorkerRequest, WorkerResponse, WorkerStatus
 from app.tools import Jurisdiction, lookup_annual_leave_policy
-from app.search import search
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +44,7 @@ class PolicyRetrievalSpecialist:
                 policy_data = lookup_annual_leave_policy(Jurisdiction.INDIA)
             else:
                 # 2. General search query via existing ChromaDB vector search
+                from app.search import search
                 search_results = search(query_text)
                 policy_data = {
                     "jurisdiction": jurisdiction_val,

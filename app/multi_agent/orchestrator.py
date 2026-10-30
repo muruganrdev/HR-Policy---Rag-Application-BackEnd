@@ -286,10 +286,11 @@ class MultiAgentOrchestrator:
                 metrics.orchestrator_latency_seconds = round(
                     max(0.0, metrics.total_latency_seconds - metrics.policy_specialist_latency_seconds), 6
                 )
+                res_status = "incomplete" if policy_resp.status == WorkerStatus.INCOMPLETE else "error"
                 return OrchestratorResult(
                     question=question,
                     answer=answer,
-                    status="error",
+                    status=res_status,
                     worker_responses=worker_responses,
                     steps=steps,
                     metrics=metrics,
@@ -299,12 +300,44 @@ class MultiAgentOrchestrator:
             carry_limit = _policy_numeric_limit(policy_resp.result, keyword="carry_over")
             encash_limit = _policy_numeric_limit(policy_resp.result, keyword="encashment")
 
-            if "encash" in q_lower and encash_limit is not None:
-                answer = f"Under the policy, the maximum annual leave encashment allowed is {int(encash_limit)} days."
-            elif carry_limit is not None:
-                answer = f"Under the policy, the annual leave carry-over limit is {int(carry_limit)} days."
+            is_encash_q = "encash" in q_lower
+            is_carry_q = any(k in q_lower for k in ("carry-over", "carry over", "carryover", "carried over", "carried forward", "carry forward"))
+
+            res_status = "success"
+            if is_encash_q and not is_carry_q:
+                if encash_limit is not None:
+                    answer = f"Under the policy, the maximum annual leave encashment allowed is {int(encash_limit)} days."
+                else:
+                    answer = "Retrieved policy evidence is insufficient to establish the maximum annual leave encashment limit under the policy."
+                    res_status = "incomplete"
+            elif is_carry_q and not is_encash_q:
+                if carry_limit is not None:
+                    answer = f"Under the policy, the annual leave carry-over limit is {int(carry_limit)} days."
+                else:
+                    answer = "Retrieved policy evidence is insufficient to establish the annual leave carry-over limit under the policy."
+                    res_status = "incomplete"
+            elif is_carry_q and is_encash_q:
+                if carry_limit is not None and encash_limit is not None:
+                    answer = f"Under the policy, unused annual leave of up to {int(carry_limit)} days may be carried over, and a maximum of {int(encash_limit)} days may be encashed."
+                elif carry_limit is not None:
+                    answer = f"Under the policy, the annual leave carry-over limit is {int(carry_limit)} days. Retrieved policy evidence is insufficient to establish the encashment limit."
+                    res_status = "incomplete"
+                elif encash_limit is not None:
+                    answer = f"Under the policy, the maximum annual leave encashment allowed is {int(encash_limit)} days. Retrieved policy evidence is insufficient to establish the carry-over limit."
+                    res_status = "incomplete"
+                else:
+                    answer = "Retrieved policy evidence is insufficient to establish annual leave carry-over or encashment limits under the policy."
+                    res_status = "incomplete"
             else:
-                answer = "Under the policy, unused annual leave of up to 10 days may be carried over, and a maximum of 5 days may be encashed."
+                if carry_limit is not None and encash_limit is not None:
+                    answer = f"Under the policy, unused annual leave of up to {int(carry_limit)} days may be carried over, and a maximum of {int(encash_limit)} days may be encashed."
+                elif carry_limit is not None:
+                    answer = f"Under the policy, the annual leave carry-over limit is {int(carry_limit)} days."
+                elif encash_limit is not None:
+                    answer = f"Under the policy, the maximum annual leave encashment allowed is {int(encash_limit)} days."
+                else:
+                    answer = "Retrieved policy evidence is insufficient to establish annual leave carry-over or encashment limits under the policy."
+                    res_status = "incomplete"
 
             t_total_end = time.monotonic()
             metrics.total_latency_seconds = round(t_total_end - t_total_start, 6)
@@ -314,7 +347,7 @@ class MultiAgentOrchestrator:
             return OrchestratorResult(
                 question=question,
                 answer=answer,
-                status="success",
+                status=res_status,
                 sources=sources,
                 worker_responses=worker_responses,
                 steps=steps,
@@ -451,17 +484,42 @@ class MultiAgentOrchestrator:
                 metrics.orchestrator_latency_seconds = round(
                     max(0.0, metrics.total_latency_seconds - metrics.policy_specialist_latency_seconds - metrics.employee_lookup_latency_seconds), 6
                 )
+                res_status = "incomplete" if policy_resp.status == WorkerStatus.INCOMPLETE else "error"
                 return OrchestratorResult(
                     question=question,
                     answer=f"Policy retrieval failed: {policy_resp.error}. Cannot compare without policy limits.",
-                    status="error",
+                    status=res_status,
                     worker_responses=worker_responses,
                     steps=steps,
                     metrics=metrics,
                 )
 
             sources.extend(policy_resp.evidence)
-            carry_limit = _policy_numeric_limit(policy_resp.result, keyword="carry_over") or 10.0
+            carry_limit = _policy_numeric_limit(policy_resp.result, keyword="carry_over")
+
+            if carry_limit is None:
+                if auth_error is not None:
+                    answer = f"{auth_error} Retrieved policy evidence is insufficient to establish the annual leave carry-over limit."
+                    res_status = "error"
+                else:
+                    name = emp_record["employee_name"]
+                    answer = f"Cannot compare {name}'s leave balance: retrieved policy evidence is insufficient to establish the annual leave carry-over limit."
+                    res_status = "incomplete"
+                t_total_end = time.monotonic()
+                metrics.total_latency_seconds = round(t_total_end - t_total_start, 6)
+                metrics.orchestrator_latency_seconds = round(
+                    max(0.0, metrics.total_latency_seconds - metrics.policy_specialist_latency_seconds - metrics.employee_lookup_latency_seconds), 6
+                )
+                return OrchestratorResult(
+                    question=question,
+                    answer=answer,
+                    status=res_status,
+                    sources=sources,
+                    worker_responses=worker_responses,
+                    steps=steps,
+                    metrics=metrics,
+                )
+
             limit_str = f"{int(carry_limit)}" if carry_limit.is_integer() else f"{carry_limit}"
 
             if auth_error is not None:
@@ -538,10 +596,11 @@ class MultiAgentOrchestrator:
                 metrics.orchestrator_latency_seconds = round(
                     max(0.0, metrics.total_latency_seconds - metrics.policy_specialist_latency_seconds - metrics.employee_lookup_latency_seconds), 6
                 )
+                res_status = "incomplete" if policy_resp.status == WorkerStatus.INCOMPLETE else "error"
                 return OrchestratorResult(
                     question=question,
                     answer=f"Policy retrieval failed: {policy_resp.error}. Calculation aborted to avoid fabricating policy limits.",
-                    status="error",
+                    status=res_status,
                     worker_responses=worker_responses,
                     steps=steps,
                     metrics=metrics,
@@ -551,12 +610,15 @@ class MultiAgentOrchestrator:
 
             # If authorization is denied, do not forward private data to eligibility specialist
             if auth_error is not None:
-                carry_limit = _policy_numeric_limit(policy_resp.result, keyword="carry_over") or 10.0
-                limit_str = f"{int(carry_limit)}" if carry_limit.is_integer() else f"{carry_limit}"
-                answer = (
-                    f"{auth_error} Under the annual leave policy, up to {limit_str} days of unused annual leave "
-                    "can be carried over to the following year."
-                )
+                carry_limit = _policy_numeric_limit(policy_resp.result, keyword="carry_over")
+                if carry_limit is None:
+                    answer = f"{auth_error} Retrieved policy evidence is insufficient to establish the annual leave carry-over limit."
+                else:
+                    limit_str = f"{int(carry_limit)}" if carry_limit.is_integer() else f"{carry_limit}"
+                    answer = (
+                        f"{auth_error} Under the annual leave policy, up to {limit_str} days of unused annual leave "
+                        "can be carried over to the following year."
+                    )
                 t_total_end = time.monotonic()
                 metrics.total_latency_seconds = round(t_total_end - t_total_start, 6)
                 metrics.orchestrator_latency_seconds = round(
@@ -603,10 +665,11 @@ class MultiAgentOrchestrator:
                 metrics.orchestrator_latency_seconds = round(
                     max(0.0, metrics.total_latency_seconds - metrics.policy_specialist_latency_seconds - metrics.eligibility_specialist_latency_seconds - metrics.employee_lookup_latency_seconds), 6
                 )
+                calc_status = "incomplete" if calc_resp.status == WorkerStatus.INCOMPLETE else "error"
                 return OrchestratorResult(
                     question=question,
                     answer=f"Calculation failed: {calc_resp.error}.",
-                    status="error",
+                    status=calc_status,
                     worker_responses=worker_responses,
                     steps=steps,
                     metrics=metrics,
